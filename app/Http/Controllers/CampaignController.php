@@ -467,6 +467,7 @@ class CampaignController extends Controller
                         $sheet->fromArray($contacts);
                     });
                 })->export('xlsx');
+                // return back();
             }
         }
         else {

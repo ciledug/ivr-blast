@@ -62,7 +62,12 @@
 <script type="text/javascript">
   $('.btn-back').click(function(e) {
     history.back();
-  })
+  });
+
+  $('#form-reset-password').submit(function() {
+    $('.btn-back').addClass('disabled');
+    $('#btn-submit-reset-password').addClass('disabled');
+  });
 </script>
 @endpush
 

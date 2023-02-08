@@ -164,7 +164,7 @@
             </div>
 
             <div class="row mt-4">
-              <form method="POST" action="{{ route('campaign.destroy') }}">
+              <form id="form-delete-campaign" method="POST" action="{{ route('campaign.destroy') }}">
                 <button type="button" class="btn btn-secondary btn-back">Cancel</button>
                 <button type="submit" class="btn btn-danger" id="btn-delete-campaign">Delete</button>
                 <input type="hidden" id="input-delete-campaign" name="campaign" value="_{{ $campaign->unique_key }}">
@@ -192,7 +192,12 @@
 
     $('.btn-back').click(function(e) {
       history.back();
-    })
+    });
+
+    $('#form-delete-campaign').submit(function() {
+      $('.btn-back').addClass('disabled');
+      $('#btn-delete-campaign').addClass('disabled');
+    });
   });
 
   function prepareContactListTable() {

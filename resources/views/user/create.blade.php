@@ -97,6 +97,11 @@
     $('.btn-back').click(function(e) {
       history.back();
     });
+
+    $('#form-create-user').submit(function() {
+      $('.btn-back').addClass('disabled');
+      $('#btn-submit-create-user').addClass('disabled');
+    });
   });
 </script>
 @endpush

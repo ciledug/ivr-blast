@@ -205,6 +205,12 @@
       $('#campaign-export-type').val('pdf');
       $('#form-campaign-export').submit();
     });
+
+    $('#form-campaign-export').submit(function() {
+      $('.btn-back').addClass('disabled');
+      $('#btn-export-excel').addClass('disabled');
+      $('#btn-export-pdf').addClass('disabled');
+    });
   });
 
   function prepareContactListTable() {

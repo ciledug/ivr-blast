@@ -70,6 +70,11 @@
     $('.btn-back').click(function(e) {
       history.back();
     });
+
+    $('#form-delete-user').submit(function() {
+      $('.btn-back').addClass('disabled');
+      $('#btn-submit-delete-user').addClass('disabled');
+    });
   });
 </script>
 @endpush

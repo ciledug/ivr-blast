@@ -5,8 +5,6 @@
   <div class="pagetitle">
     <h1>My Account</h1>
   </div>
-
-  {{-- {{ dd($errors->has('username')) }} --}}
   
   <section class="section">
     <div class="row">
@@ -103,6 +101,18 @@
 
 @push('javascript')
 <script type="text/javascript">
+  $('#form-account-profile').submit(function() {
+    disableAllButtons();
+  });
+
+  $('#form-account-password').submit(function() {
+    disableAllButtons();
+  });
+
+  function disableAllButtons() {
+    $('#btn-submit-profile').addClass('disabled');
+    $('#btn-submit-password').addClass('disabled');
+  }
 </script>
 @endpush
 

@@ -20,7 +20,7 @@
       <div class="col-lg-12">
 
         <div class="card">
-          <form class="g-3 needs-validation" method="POST" action="{{ route('campaign.store') }}" enctype="multipart/form-data">
+          <form id="form-create-campaign" class="g-3 needs-validation" method="POST" action="{{ route('campaign.store') }}" enctype="multipart/form-data">
             <div class="card-body">
               <h5 class="card-title">
                   Add Campaign
@@ -58,7 +58,7 @@
               </div>
 
               <div class="col-md-12 mt-4">
-                <button type="button" class="btn btn-secondary btn-back">Close</button>
+                <button type="button" class="btn btn-secondary btn-back">Cancel</button>
                 <button type="submit" class="btn btn-primary" id="btn-submit-create-campaign">Save</button>
                 {{ csrf_field() }}
                 <input type="hidden" id="input-campaign-rows" name="input_campaign_rows" value="" required>
@@ -88,6 +88,26 @@ var contactDataContainer = '';
     });
     $('#input-campaign-excel-file').val('');
     $('#input-campaign-rows').val('');
+
+    $('#form-create-campaign').submit(function() {
+      var okSubmit = true;
+
+      if ( $('#input-campaign-name').val().trim() === '') {
+        okSubmit = false;
+      }
+
+      if ( $('#input-campaign-rows').val().trim() === '') {
+        okSubmit = false;
+      }
+
+      if (!okSubmit) {
+        return false;
+      }
+      else {
+        $('#btn-submit-create-campaign').addClass('disabled');
+        $('.btn-back').addClass('disabled');
+      }
+    });
   });
 
   function preparePreviewContactTable() {

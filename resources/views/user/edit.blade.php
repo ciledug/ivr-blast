@@ -80,6 +80,11 @@
     $('.btn-back').click(function(e) {
       history.back();
     });
+
+    $('#form-update-user').submit(function() {
+      $('.btn-back').addClass('disabled');
+      $('#btn-submit-update-user').addClass('disabled');
+    });
   });
 </script>
 @endpush

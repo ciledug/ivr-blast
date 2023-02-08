@@ -21,7 +21,7 @@
 
         <div class="card">
           <div class="card-body">
-            <form class="g-3 needs-validation" method="POST" action="{{ route('campaign.update') }}" enctype="multipart/form-data">
+            <form id="form-update-campaign" class="g-3 needs-validation" method="POST" action="{{ route('campaign.update') }}" enctype="multipart/form-data">
               <h5 class="card-title">
                   Edit Campaign
               </h5>
@@ -124,6 +124,11 @@ var editAction = '';
     $('#btn-edit-contact-action-replace').click(function(e) {
       $('#edit-campaign-action').val('replace');
       changeEditActionButtons();
+    });
+
+    $('#form-update-campaign').submit(function() {
+      $('.btn-back').addClass('disabled');
+      $('#btn-submit-edit-campaign').addClass('disabled');
     });
   });
 
