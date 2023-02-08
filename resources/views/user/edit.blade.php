@@ -82,6 +82,13 @@
     });
 
     $('#form-update-user').submit(function() {
+      if (
+        $('#input-user-name').val().trim() === ''
+        || $('#input-user-username').val().trim() === ''
+      ) {
+        return false;
+      }
+
       $('.btn-back').addClass('disabled');
       $('#btn-submit-update-user').addClass('disabled');
     });

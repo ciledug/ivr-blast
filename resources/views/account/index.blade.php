@@ -102,10 +102,25 @@
 @push('javascript')
 <script type="text/javascript">
   $('#form-account-profile').submit(function() {
+    if (
+      $('#input-profile-name').val().trim() === ''
+      || $('#input-profile-username').val().trim() === ''
+    ) {
+      return false;
+    }
+
     disableAllButtons();
   });
 
   $('#form-account-password').submit(function() {
+    if (
+      $('#input-old-password').val().trim() === ''
+      || $('#input-new-password').val().trim() === ''
+      || $('#input-confirm-password').val().trim() === ''
+    ) {
+      return false;
+    }
+
     disableAllButtons();
   });
 
