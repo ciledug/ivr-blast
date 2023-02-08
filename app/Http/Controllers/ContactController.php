@@ -23,14 +23,31 @@ class ContactController extends Controller
     {
         $data = array();
 
-        $contact = Contact::where('account_id', '=', Str::replaceFirst('_', '', $request->contact))
-            ->whereNull('deleted_at')
+        $contact = Contact::select([
+                'contacts.id', 'contacts.account_id', 'contacts.name', 'contacts.phone', 'contacts.bill_date', 'contacts.due_date', 'contacts.nominal',
+                'call_logs.call_dial', 'call_logs.call_connect', 'call_logs.call_connect', 'call_logs.call_disconnect',
+                'call_logs.call_duration', 'call_logs.call_response'
+            ])
+            ->leftJoin('call_logs', 'call_logs.contact_id', '=', 'contacts.id')
+            ->where('contacts.campaign_id', '=', $request->campaign)
+            ->where('contacts.account_id', '=', Str::replaceFirst('_', '', $request->contact))
+            ->whereNull('contacts.deleted_at')
+            ->orderBy('call_logs.created_at', 'DESC')
             ->first();
 
         if ($contact) {
+            $contact->nominal = number_format($contact->nominal, 0, ',', '.');
+            $contact->call_response = 0;
+
+            if ($contact->call_response == 0) $contact->call_response = 'Answered';
+            else if ($contact->call_response == 1) $contact->call_response = 'No Answer';
+            else if ($contact->call_response == 2) $contact->call_response = 'Busy';
+            else $contact->call_response = 'Failed';
+
             $data['contact'] = $contact;
         }
-
+        
+        // dd($contact);
         return view('contact.show', $data);
     }
 

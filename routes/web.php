@@ -59,7 +59,7 @@ Route::group(
         });
         
         Route::prefix('contact')->group(function() {
-            Route::get('show/{contact?}', 'ContactController@show')->name('contact.show');
+            Route::get('show/{contact?}/{campaign?}', 'ContactController@show')->name('contact.show');
             Route::get('list/{campaign?}', 'ContactController@contactList')->name('contact.list');
         });
         

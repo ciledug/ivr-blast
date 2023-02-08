@@ -236,7 +236,7 @@
           data: null,
           render: function(data, type, row, meta) {
             contactList['_' + row.account_id] = row;
-            var tempContent = '<a href="{{ route('contact.show') }}/_' + row.account_id + '" class="btn btn-sm btn-info">Detail</a>';
+            var tempContent = '<a href="{{ route('contact.show') }}/_' + row.account_id + '/{{ $campaign->id }}" class="btn btn-sm btn-info">Detail</a>';
             return tempContent;
           }
         }

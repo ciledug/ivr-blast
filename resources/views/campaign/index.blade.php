@@ -103,10 +103,10 @@ var campaignList = [];
             tempContent += '&nbsp;<a href="{{ route('campaign.show') }}/_' + row.key + '" class="btn btn-sm btn-info">Detail</a>';
 
             if (row.progress <= 0) {
-              tempContent += '&nbsp;<a href="{{ route('campaign.edit') }}/_' + row.key + '" class="btn btn-sm' + btnEditCss + '">Edit</button>';
+              tempContent += '&nbsp;<a href="{{ route('campaign.edit') }}/_' + row.key + '" class="btn btn-sm' + btnEditCss + '">Edit</a>';
             }
             
-            tempContent += '&nbsp;<a href="{{ route('campaign.delete') }}/_' + row.key + '" class="btn btn-sm' + btnDeleteCss + '">Delete</button>';
+            tempContent += '&nbsp;<a href="{{ route('campaign.delete') }}/_' + row.key + '" class="btn btn-sm' + btnDeleteCss + '">Delete</a>';
             return tempContent;
           }
         },

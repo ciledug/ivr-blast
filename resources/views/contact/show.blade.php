@@ -33,7 +33,7 @@
                       <div class="col-lg-4 col-md-4 label">No.</div>
                     </div>
                     <div class="row">
-                      <div class="col-lg-4 col-md-8 h5" id="dialog-detail-contact-sequence"></div>
+                      <div class="col-lg-4 col-md-8 h5" id="dialog-detail-contact-sequence">{{ $contact->id }}</div>
                     </div>
                   </div>
                 </div>
@@ -114,7 +114,7 @@
                       <div class="col-lg-4 col-md-4 label">Call Dial</div>
                     </div>
                     <div class="row">
-                      <div class="col-lg-8 col-md-8 h5" id="dialog-detail-contact-call-dial">{{ $contact->call_dial }}</div>
+                      <div class="col-lg-8 col-md-8 h5" id="dialog-detail-contact-call-dial">{{ $contact->call_dial or '0000-00-00 00:00' }}</div>
                     </div>
                   </div>
                 </div>
@@ -125,7 +125,7 @@
                       <div class="col-lg-4 col-md-4 label">Call Connect</div>
                     </div>
                     <div class="row">
-                      <div class="col-lg-8 col-md-8 h5" id="dialog-detail-contact-call-connect">{{ $contact->call_connect }}</div>
+                      <div class="col-lg-8 col-md-8 h5" id="dialog-detail-contact-call-connect">{{ $contact->call_connect or '0000-00-00 00:00' }}</div>
                     </div>
                   </div>
                 </div>
@@ -136,7 +136,7 @@
                       <div class="col-lg-5 col-md-4 label">Call Disconnect</div>
                     </div>
                     <div class="row">
-                      <div class="col-lg-7 col-md-8 h5" id="dialog-detail-contact-call-disconnect">{{ $contact->call_disconnect }}</div>
+                      <div class="col-lg-7 col-md-8 h5" id="dialog-detail-contact-call-disconnect">{{ $contact->call_disconnect or '0000-00-00 00:00' }}</div>
                     </div>
                   </div>
                 </div>
@@ -147,7 +147,7 @@
                       <div class="col-lg-5 col-md-4 label">Call Duration</div>
                     </div>
                     <div class="row">
-                      <div class="col-lg-7 col-md-8 h5" id="dialog-detail-contact-call-duration">{{ $contact->call_duration }}</div>
+                      <div class="col-lg-7 col-md-8 h5" id="dialog-detail-contact-call-duration">{{ $contact->call_duration or '0' }}</div>
                     </div>
                   </div>
                 </div>
@@ -158,7 +158,7 @@
                       <div class="col-lg-5 col-md-4 label">Call Response</div>
                     </div>
                     <div class="row">
-                      <div class="col-lg-7 col-md-8 h5" id="dialog-detail-contact-call-response">{{ $contact->call_response }}</div>
+                      <div class="col-lg-7 col-md-8 h5" id="dialog-detail-contact-call-response">{{ $contact->call_response or '' }}</div>
                     </div>
                   </div>
                 </div>
