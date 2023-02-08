@@ -20,7 +20,6 @@ Route::group(
     function() {
         // Route::get('/home', 'HomeController@index')->name('home');
         Route::get('/dashboard', "DashboardController@index")->name('dashboard');
-        Route::get('logout', 'LoginController@logout')->name('logout');
 
         Route::prefix('campaign')->group(function() {
             Route::get('/', "CampaignController@index")->name('campaign');

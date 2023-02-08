@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Validator;
 
 use App\UserLog;
 use Carbon\Carbon;
@@ -47,11 +48,16 @@ class LoginController extends Controller
     {
         $input = $request->all();
 
-        $this->validate($request, [
+        $validator = Validator::make($request->input(), [
             'username' => 'required|string|min:5|max:20',
             'password' => 'required|string|min:6|max:15'
         ]);
 
+        if ($validator->fails()) {
+            return back()->withErrors($validator)->withInput();
+        }
+
+        $validator->errors()->add('login_invalid', 'Username or Password is incorrect!');
         $fieldType = filter_var($request->username, FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
 
         if (auth()->attempt(array(
@@ -66,8 +72,7 @@ class LoginController extends Controller
             return redirect()->route('dashboard');
         }
         else {
-            return redirect()->route('login')
-                ->with('error', 'Username and/or Password incorrect');
+            return back()->withErrors($validator)->withInput();
         }
     }
 }

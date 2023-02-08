@@ -8,7 +8,7 @@
 
                     <div class="col-lg-4 col-md-6 d-flex flex-column align-items-center justify-content-center">
                         <div class="d-flex justify-content-center py-4">
-                            <a href="index.html" class="logo d-flex align-items-center w-auto">
+                            <a class="logo d-flex align-items-center w-auto">
                                 <span class="d-none d-lg-block">DALnet System - IVR Broadcast</span>
                             </a>
                         </div>
@@ -18,43 +18,22 @@
                                 <div class="pt-4 pb-2">
                                     <h5 class="card-title text-center pb-0 fs-4">Login to Your Account</h5>
                                     <p class="text-center small">Enter your username &amp; password to login</p>
+
+                                    @if ($errors->has('login_invalid'))
+                                    <div class="mb-2 invalid-feedback" style="display:block; text-align:center;">
+                                        <strong>{{ $errors->first('login_invalid') }}</strong>
+                                    </div>
+                                    @endif
                                 </div>
                   
                                 <form id="form-login" class="row g-3 needs-validation" method="POST" action="{{ route('login') }}">
                                     {{ csrf_field() }}
-                                    
-                                    <!--
-                                    <div class="col-12">
-                                        <label for="input-login-username" class="form-label">Username</label>
-                                        <div class="input-group has-validation">
-                                            <span class="input-group-text" id="input-login-username">@</span>
-                                            <input type="text" id="input-login-username" name="input-login-username" class="form-control" required>
-                                            <div class="invalid-feedback">Please enter your username.</div>
-                                        </div>
-                                    </div>
-
-                                    <div class="col-12">
-                                        <label for="input-login-password" class="form-label">Password</label>
-                                        <input type="password" id="input-login-password" name="input-login-password" class="form-control" required>
-                                        <div class="invalid-feedback">Please enter your password!</div>
-                                    </div>
-
-                                    <div class="col-12">
-                                        <label for="email" class="form-label">Email</label>
-                                        <input type="text" id="email" name="email" class="form-control" value="{{ old('email') }}" required autofocus>
-                                        @if ($errors->has('email'))
-                                        <div class="invalid-feedback">
-                                            <strong>{{ $errors->first('email') }}</strong>
-                                        </div>
-                                        @endif
-                                    </div>
-                                    -->
 
                                     <div class="col-12">
                                         <label for="username" class="form-label">Username</label>
-                                        <input type="text" id="username" name="username" class="form-control" value="{{ old('username') }}" required autofocus>
+                                        <input type="text" id="username" name="username" class="form-control" minlength="5" maxlength="20" value="{{ old('username') }}" required autofocus>
                                         @if ($errors->has('username'))
-                                        <div class="invalid-feedback">
+                                        <div class="invalid-feedback" style="display:block">
                                             <strong>{{ $errors->first('username') }}</strong>
                                         </div>
                                         @endif
@@ -62,9 +41,9 @@
                     
                                     <div class="col-12">
                                         <label for="password" class="form-label">Password</label>
-                                        <input type="password" id="password" name="password" class="form-control" required>
+                                        <input type="password" id="password" name="password" class="form-control" minlength="6" maxlength="15" required>
                                         @if ($errors->has('password'))
-                                        <div class="invalid-feedback">
+                                        <div class="invalid-feedback" style="display:block">
                                             <strong>{{ $errors->first('password') }}</strong>
                                         </div>
                                         @endif
