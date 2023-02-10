@@ -235,6 +235,69 @@ class UserController extends Controller
         return response()->json($returnedResponse);
     }
 
+    public function getUserListAjax(Request $request)
+    {
+        $ORDERED_COLUMNS = ['name', 'username', 'last_login', 'last_ip_address', 'added_by'];
+        $ORDERED_BY = ['desc', 'asc'];
+        $COLUMN_IDX = is_numeric($request->order[0]['column']) ? $request->order[0]['column'] : 0;
+        $START = is_numeric($request->start) ? $request->start : 0;
+        $LENGTH = is_numeric($request->length) ? $request->length : 10;
+        $SEARCH_VALUE = !empty($request->search['value']) ? $request->search['value'] : '';
+
+        $recordsTotalQuery = 0;
+        $userList = [];
+
+        $query = User::select(['name', 'username', 'email', 'added_by'])
+            ->offset($START)
+            ->limit($LENGTH);
+
+        if (!empty($SEARCH_VALUE)) {
+            $query->where(function($q) use($SEARCH_VALUE) {
+                $q->where('name', 'LIKE', '%' . $SEARCH_VALUE . '%')
+                    ->orWhere('username', 'LIKE', '%' . $SEARCH_VALUE . '%')
+                    ->orwhere('last_login', 'LIKE', '%' . $SEARCH_VALUE . '%')
+                    ->orwhere('last_ip_address', 'LIKE', '%' . $SEARCH_VALUE . '%')
+                    ->orwhere('added_by', 'LIKE', '%' . $SEARCH_VALUE . '%');
+            });
+        }
+
+        if (in_array($request->order[0]['dir'], $ORDERED_BY)) {
+            $query->orderBy($ORDERED_COLUMNS[$COLUMN_IDX], $request->order[0]['dir']);
+        }
+
+        $users = $query->get();
+
+        if ($users) {
+            if ($users->count() > 0) {
+                foreach ($users AS $keyUser => $valueUser) {
+                    $userLog = UserLog::select(['last_login', 'last_ip_address'])
+                        ->where('user_id', '=', $valueUser->id)
+                        ->orderBy('last_login', 'DESC')
+                        ->first();
+                    // dd($userLog);
+
+                    $userList[] = array(
+                        'name' => $valueUser->name,
+                        'username' => $valueUser->username,
+                        'email' => $valueUser->email,
+                        'added_by' => $valueUser->added_by,
+                        'last_login' => $userLog ? $userLog->last_login : '',
+                        'last_ip_address' => $userLog ? $userLog->last_ip_address : '',
+                    );
+                }
+            }
+        }
+
+        $returnedResponse = array(
+            'draw' => $request->draw,
+            'recordsTotal' => count($userList),
+            'recordsFiltered' => $recordsTotalQuery,
+            'data' => $userList
+        );
+
+        return response()->json($returnedResponse);
+    }
+
     public function showResetPassword(Request $request, $userName)
     {
         $data = array();

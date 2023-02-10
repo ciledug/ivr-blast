@@ -29,6 +29,7 @@ Route::group(
             Route::get('delete/{campaign?}', "CampaignController@delete")->name('campaign.delete');
     
             Route::get('list', 'CampaignController@getCampaignList')->name('campaign.list');
+            Route::post('list/ajax', 'CampaignController@getCampaignListAjax')->name('campaign.list.ajax');
             Route::post('/', 'CampaignController@store')->name('campaign.store');
             Route::put('/', 'CampaignController@update')->name('campaign.update');
             Route::put('startstop', 'CampaignController@updateStartStop')->name('campaign.update.startstop');
@@ -45,6 +46,7 @@ Route::group(
             Route::get('delete/{username?}', "UserController@delete")->name('user.delete');
     
             Route::get('list', 'UserController@getUserList')->name('user.list');
+            Route::post('list', 'UserController@getUserListAjax')->name('user.list.ajax');
             Route::post('/', 'UserController@store')->name('user.store');
             Route::put('/', 'UserController@update')->name('user.update');
             Route::put('resetpass', 'UserController@updatePassword')->name('user.update.password');
@@ -60,6 +62,7 @@ Route::group(
         Route::prefix('contact')->group(function() {
             Route::get('show/{contact?}/{campaign?}', 'ContactController@show')->name('contact.show');
             Route::get('list/{campaign?}', 'ContactController@contactList')->name('contact.list');
+            Route::post('list', 'ContactController@contactListAjax')->name('contact.list.ajax');
         });
         
         Route::prefix('call')->group(function() {

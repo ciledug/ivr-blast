@@ -474,4 +474,108 @@ class CampaignController extends Controller
             return back();
         }
     }
+
+    public function getCampaignListAjax(Request $request)
+    {
+        $ORDERED_COLUMNS = ['created', 'created', 'name', 'total', 'status', 'created_by'];
+        $ORDERED_BY = ['desc', 'asc'];
+        $COLUMN_IDX = is_numeric($request->order[0]['column']) ? $request->order[0]['column'] : 0;
+        $START = is_numeric($request->start) ? $request->start : 0;
+        $LENGTH = is_numeric($request->length) ? $request->length : 10;
+        $SEARCH_VALUE = !empty($request->search['value']) ? $request->search['value'] : '';
+
+        $campaignList = array();
+
+        $query = Campaign::select(DB::raw('
+                campaigns.id AS campaign_id, campaigns.unique_key, campaigns.name, campaigns.total_data, campaigns.total_calls, campaigns.created_by,
+                IF (campaigns.status = 0, "Ready", IF (campaigns.status = 1, "Running", "Finished")) AS status,
+                DATE_FORMAT(campaigns.created_at, "%d/%m/%Y - %H:%i") AS created,
+                (SELECT COUNT(contacts.call_dial) FROM contacts WHERE contacts.campaign_id = campaigns.id AND contacts.call_dial IS NOT NULL) AS call_dial,
+                (SELECT COUNT(contacts.call_connect) FROM contacts WHERE contacts.campaign_id = campaigns.id AND contacts.call_connect IS NOT NULL) AS call_connect
+            '))
+            ->offset($START)
+            ->limit($LENGTH);
+
+        if (!empty($SEARCH_VALUE)) {
+            $query->where(function($q) use($SEARCH_VALUE) {
+                $q->Where('campaigns.name', 'LIKE', '%' . $SEARCH_VALUE . '%')
+                    ->orWhere('campaigns.created_by', 'LIKE', '%' . $SEARCH_VALUE . '%')
+                    ->orwhere('campaigns.created_at', 'LIKE', '%' . $SEARCH_VALUE . '%');
+            });
+        }
+
+        if (in_array($request->order[0]['dir'], $ORDERED_BY)) {
+            $query->orderBy($ORDERED_COLUMNS[$COLUMN_IDX], $request->order[0]['dir']);
+        }
+
+        DB::enableQueryLog();
+        $campaignData = $query->get();
+        // dd(DB::getQueryLog());
+
+        if ($campaignData) {
+            if (count($campaignData) > 0) {
+                $seq = 1;
+                $tempFailedCalls = 0;
+                $tempStartDate = '';
+                $tempFinishDate = '';
+                $tempProgress = 0;
+
+                foreach ($campaignData AS $keyCampaignData => $valueCampaignData) {
+                    $tempProgress = 0;
+                    if ($valueCampaignData->call_dial > 0) {
+                        $tempProgress = ($valueCampaignData->call_dial / $valueCampaignData->total_data) * 100;
+                    }
+
+                    $tempFailedCalls = CallLog::select('call_logs.contact_id')
+                        ->where('contacts.campaign_id', '=', $valueCampaignData->campaign_id)
+                        ->where('call_logs.call_response', '=', 3)
+                        ->leftJoin('contacts', 'call_logs.contact_id', '=', 'contacts.id')
+                        ->orderBy('call_logs.created_at', 'DESC')
+                        ->count('call_logs.contact_id');
+
+                    $tempStartDate = Contact::select(DB::raw('
+                            DATE_FORMAT(MIN(call_logs.call_dial), "%d/%m/%Y %H:%i") AS started
+                        '))
+                        ->where('contacts.campaign_id', '=', $valueCampaignData->campaign_id)
+                        ->leftJoin('call_logs', 'contacts.id', '=', 'call_logs.contact_id')
+                        ->first();
+
+                    $tempFinishDate = Contact::select(DB::raw('
+                            DATE_FORMAT(MAX(call_logs.call_disconnect), "%d/%m/%Y %H:%i") AS finished
+                        '))
+                        ->where('contacts.campaign_id', '=', $valueCampaignData->campaign_id)
+                        ->leftJoin('call_logs', 'contacts.id', '=', 'call_logs.contact_id')
+                        ->first();
+
+                    $campaignList[] = array(
+                        'seq' => $seq,
+                        'created' => $valueCampaignData->created,
+                        'name' => $valueCampaignData->name,
+                        'started' => $tempStartDate->started,
+                        'finished' => $tempFinishDate->finished,
+                        'total' => $valueCampaignData->total_data,
+                        'total_calls' => $valueCampaignData->total_calls,
+                        'call_dial' => $valueCampaignData->call_dial,
+                        'call_connect' => $valueCampaignData->call_connect,
+                        'call_failed' => $tempFailedCalls,
+                        'status' => $valueCampaignData->status,
+                        'created_by' => $valueCampaignData->created_by,
+                        'key' => $valueCampaignData->unique_key,
+                        'progress' => $tempProgress,
+                    );
+                    
+                    $seq++;
+                }
+            }
+        }
+
+        $returnedResponse = array(
+            'draw' => $request->draw,
+            'recordsTotal' => Campaign::all()->count(),
+            'recordsFiltered' => count($campaignList),
+            'data' => $campaignList
+        );
+
+        return response()->json($returnedResponse);
+    }
 }

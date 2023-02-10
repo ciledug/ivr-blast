@@ -53,14 +53,80 @@
 <script type="text/javascript">
   $(document).ready(function() {
     prepareUserListTable();
-    getUserList(userListContainer);
+    // getUserList(userListContainer);
   });
 
   var userListContainer = '';
   var userList = [];
 
+  // function prepareUserListTable() {
+  //   userListContainer = $('#table-user-list-container').DataTable({
+  //     columns: [
+  //       { data: null },
+  //       { data: 'name' },
+  //       { data: 'username' },
+  //       { data: 'last_login' },
+  //       { data: 'last_ip_address' },
+  //       { data: 'added_by' }
+  //     ],
+  //     columnDefs: [
+  //       {
+  //         targets: 0,
+  //         render: function(data, type, row, meta) {
+  //           return ++meta.row + '.';
+  //         }
+  //       },
+  //       {
+  //         targets: 6,
+  //         data: null,
+  //         render: function(data, type, row, meta) {
+  //           userList['_' + row.username] = row;
+
+  //           var tempContent = '';
+  //           tempContent += '<a href="{{ route('user.resetpass') }}/_' + row.username + '" class="btn btn-sm btn-info">Password</a>&nbsp;';
+  //           tempContent += '<a href="{{ route('user.edit') }}/_' + row.username + '" class="btn btn-sm btn-warning">Edit</button>&nbsp;';
+  //           tempContent += '<a href="{{ route('user.delete') }}/_' + row.username + '" class="btn btn-sm btn-danger">Delete</button>';
+  //           return tempContent;
+  //         }
+  //       },
+  //     ]
+  //   });
+  // };
+
+  // function getUserList(dataContainer) {
+  //   $.ajax({
+  //     type: 'GET',
+  //     url: '{{ route('user.list') }}',
+  //     headers: {
+  //       'X-CSRF-TOKEN': '{{ csrf_token() }}'
+  //     },
+  //     processData: false,
+  //     contentType: false,
+  //     cache: false,
+  //     success: function(response) {
+  //       dataContainer.clear();
+  //       dataContainer.rows.add(response.data);
+  //       dataContainer.draw();
+  //     },
+  //     error: function(error) {
+  //       console.log(error.responseText);
+  //     }
+  //   })
+  //   .always(function() {
+  //   });
+  // };
+
   function prepareUserListTable() {
     userListContainer = $('#table-user-list-container').DataTable({
+      processing: true,
+      serviceSide: true,
+      ajax: {
+        url: '{{ route('user.list.ajax') }}',
+        type: 'POST',
+        headers: {
+          'X-CSRF-TOKEN': '{{ csrf_token() }}'
+        }
+      },
       columns: [
         { data: null },
         { data: 'name' },
@@ -78,43 +144,21 @@
         },
         {
           targets: 6,
+          orderable: false,
           data: null,
           render: function(data, type, row, meta) {
             userList['_' + row.username] = row;
 
             var tempContent = '';
             tempContent += '<a href="{{ route('user.resetpass') }}/_' + row.username + '" class="btn btn-sm btn-info">Password</a>&nbsp;';
-            tempContent += '<a href="{{ route('user.edit') }}/_' + row.username + '" class="btn btn-sm btn-warning">Edit</button>&nbsp;';
-            tempContent += '<a href="{{ route('user.delete') }}/_' + row.username + '" class="btn btn-sm btn-danger">Delete</button>';
+            tempContent += '<a href="{{ route('user.edit') }}/_' + row.username + '" class="btn btn-sm btn-warning">Edit</a>&nbsp;';
+            tempContent += '<a href="{{ route('user.delete') }}/_' + row.username + '" class="btn btn-sm btn-danger">Delete</a>';
             return tempContent;
           }
         },
       ]
     });
   }
-
-  function getUserList(dataContainer) {
-    $.ajax({
-      type: 'GET',
-      url: '{{ route('user.list') }}',
-      headers: {
-        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-      },
-      processData: false,
-      contentType: false,
-      cache: false,
-      success: function(response) {
-        dataContainer.clear();
-        dataContainer.rows.add(response.data);
-        dataContainer.draw();
-      },
-      error: function(error) {
-        console.log(error.responseText);
-      }
-    })
-    .always(function() {
-    });
-  };
 </script>
 @endpush
 

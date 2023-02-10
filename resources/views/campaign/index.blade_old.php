@@ -55,36 +55,9 @@ var campaignList = [];
 
   $(document).ready(function() {
     prepareCampaignListTable();
-    // getCampaignList();
+    getCampaignList();
   });
-
-  function startStopCampaign(campaignKey) {
-    $.ajax({
-      method: 'PUT',
-      url: '{{ route('campaign.update.startstop') }}',
-      headers: {
-        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-      },
-      data: JSON.stringify({
-        campaign: campaignKey,
-        startStop: true,
-        _token: '{{ csrf_token() }}'
-      }),
-      processData: false,
-      contentType: 'application/json',
-      cache: false,
-      success: function(response) {
-        getCampaignList();
-      },
-      error: function(error) {
-        console.log(error.responseText);
-      }
-    })
-    .always(function() {
-    });
-  }
  
-  /*
   function prepareCampaignListTable() {
     campaignListContainer = $('#table-campaign-list-container').DataTable({
       columns: [
@@ -163,76 +136,32 @@ var campaignList = [];
     .always(function() {
     });
   }
-  */
 
-  function prepareCampaignListTable() {
-    campaignListContainer = $('#table-campaign-list-container').DataTable({
-      processing: true,
-      serverSide: true,
-      responsive: true,
-      ajax: {
-        url: '{{ route('campaign.list.ajax') }}',
-        type: 'POST',
-        headers: {
-          'X-CSRF-TOKEN': '{{ csrf_token() }}'
-        }
+  function startStopCampaign(campaignKey) {
+    $.ajax({
+      method: 'PUT',
+      url: '{{ route('campaign.update.startstop') }}',
+      headers: {
+        'X-CSRF-TOKEN': '{{ csrf_token() }}'
       },
-      columns: [
-        { data: null },
-        { data: 'created' },
-        { data: 'name' },
-        { data: 'total' },
-        { data: 'status' },
-        { data: 'created_by' }
-      ],
-      columnDefs: [
-        {
-          targets: 0,
-          orderable: false,
-          render: function(data, type, row, meta) {
-            return ++meta.row + '.';
-          }
-        },
-        {
-          targets: 3,
-          className: 'dt-body-right'
-        },
-        {
-          targets: 6,
-          data: null,
-          render: function(data, type, row, meta) {
-            campaignList['_' + row.key] = row;
-
-            var tempContent = '';
-            var titleStartStop = 'Start';
-            var btnStartStopCss = ' btn-success';
-            var btnEditCss = ' btn-warning';
-            var btnDeleteCss = ' btn-danger';
-            var rowStatus = row.status.toLowerCase();
-
-            switch (rowStatus) {
-              case 'running': titleStartStop = 'Stop'; btnStartStopCss = ' btn-danger'; btnEditCss = ' btn-outline-warning disabled'; btnDeleteCss = ' btn-outline-danger disabled'; break;
-              case 'finished': btnStartStopCss += ' btn-outline-success disabled'; btnEditCss = ' btn-outline-warning disabled'; btnDeleteCss = ' btn-outline-danger disabled'; break;
-              case 'ready':
-              default: break;
-            }
-
-            tempContent += '<button type="button" class="btn btn-sm' + btnStartStopCss + ' btn-start-stop" data-key="_' + row.key + '" onclick="startStopCampaign(\'' + row.key + '\')">' + titleStartStop + '</button>';
-            tempContent += '&nbsp;<a href="{{ route('campaign.show') }}/_' + row.key + '" class="btn btn-sm btn-info">Detail</a>';
-
-            if (row.progress <= 0) {
-              tempContent += '&nbsp;<a href="{{ route('campaign.edit') }}/_' + row.key + '" class="btn btn-sm' + btnEditCss + '">Edit</a>';
-            }
-            
-            tempContent += '&nbsp;<a href="{{ route('campaign.delete') }}/_' + row.key + '" class="btn btn-sm' + btnDeleteCss + '">Delete</a>';
-            return tempContent;
-          }
-        },
-      ]
+      data: JSON.stringify({
+        campaign: campaignKey,
+        startStop: true,
+        _token: '{{ csrf_token() }}'
+      }),
+      processData: false,
+      contentType: 'application/json',
+      cache: false,
+      success: function(response) {
+        getCampaignList();
+      },
+      error: function(error) {
+        console.log(error.responseText);
+      }
+    })
+    .always(function() {
     });
   }
-
-
 </script>
 @endpush
 
