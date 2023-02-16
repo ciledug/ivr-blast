@@ -23,6 +23,9 @@ class CampaignController extends Controller
 {
 
     //use Fpdf;
+
+
+    // belum ada untuk pemeriksaan duplikasi data apabila ada upload file excel
     
     public function __construct()
     {
@@ -50,7 +53,7 @@ class CampaignController extends Controller
                 campaigns.total_data AS total_data,
                 campaigns.total_calls AS total_calls,
                 campaigns.created_at,
-                IF(campaigns.status = 0, 'Ready', IF(campaigns.status = 1, 'Running', 'Finished')) AS status,
+                IF(campaigns.status = 0, 'Ready', IF(campaigns.status = 1, 'Running', IF(campaigns.status = 2, 'Finished', 'Paused'))) AS status,
                 (SELECT COUNT(contacts.call_dial) FROM contacts WHERE contacts.campaign_id = campaigns.id AND contacts.call_dial IS NOT NULL) AS call_dial,
                 (SELECT COUNT(contacts.call_connect) FROM contacts WHERE contacts.campaign_id = campaigns.id AND contacts.call_connect IS NOT NULL) AS call_connect,
                 (SELECT COUNT(contacts.call_duration) FROM contacts WHERE contacts.campaign_id = campaigns.id AND contacts.call_duration IS NOT NULL) AS call_duration
@@ -83,7 +86,7 @@ class CampaignController extends Controller
             $campaignData->failed = $tempFailedCalls;
 
             $tempStartDate = Contact::select(DB::raw('
-                    IF (call_logs.call_dial IS NOT NULL, DATE_FORMAT(MIN(call_logs.call_dial), "%d/%m/%Y %H:%i"), \'0000-00-00 00:00:00\') AS started
+                    IF (call_logs.call_dial IS NOT NULL, DATE_FORMAT(MIN(call_logs.call_dial), "%d/%m/%Y %H:%i"), \'-\') AS started
                 '))
                 ->where('contacts.campaign_id', '=', $campaignData->id)
                 ->leftJoin('call_logs', 'contacts.id', '=', 'call_logs.contact_id')
@@ -91,7 +94,7 @@ class CampaignController extends Controller
             $campaignData->started = $tempStartDate->started;
 
             $tempFinishDate = Contact::select(DB::raw('
-                    IF (call_logs.call_disconnect IS NOT NULL, DATE_FORMAT(MAX(call_logs.call_disconnect), "%d/%m/%Y %H:%i"), \'0000-00-00 00:00:00\') AS finished
+                    IF (call_logs.call_disconnect IS NOT NULL, DATE_FORMAT(MAX(call_logs.call_disconnect), "%d/%m/%Y %H:%i"), \'-\') AS finished
                 '))
                 ->where('contacts.campaign_id', '=', $campaignData->id)
                 ->leftJoin('call_logs', 'contacts.id', '=', 'call_logs.contact_id')
@@ -100,6 +103,8 @@ class CampaignController extends Controller
 
             $data['campaign'] = $campaignData;
         }
+
+        // dd($data['campaign']);
 
         return view('campaign.show', $data);
     }
@@ -180,7 +185,7 @@ class CampaignController extends Controller
         
         return redirect()->route('campaign');
     }
-
+    
     public function update(Request $request)
     {
         $validator = Validator::make($request->input(), [
@@ -339,28 +344,52 @@ class CampaignController extends Controller
 
     public function updateStartStop(Request $request)
     {
-        $returnedCode = 500;
-        $campaignList = array();
-
-        $campaignData = Campaign::where('unique_key', $request->input('campaign'))
-            ->whereNull('deleted_at')
-            ->first();
-
-        if ($campaignData != null) {
-            if ($request->input('startStop') != null) {
-                $campaignData->status = !$campaignData->status;
-                $campaignData->save();
-            }
-            else {
-                // 
-            }
-
-            $returnedCode = 200;
-        }
+        // dd($request->input());
 
         $returnedResponse = array(
-            'code' => $returnedCode
+            'code' => 500,
+            'message' => 'Server Failed',
+            'count' => 0,
+            'data' => array(),
         );
+
+        $validator = Validator::make($request->input(), [
+            'campaign' => 'required|numeric',
+            'currstatus' => 'required|string|min:5|max:9',
+            'startstop' => 'required|boolean',
+        ]);
+
+        if ($validator->fails()) {
+            $returnedResponse['message'] = $validator->errors();
+        }
+        else {
+            $campaignData = Campaign::where('unique_key', '=', $request->campaign)
+                ->first();
+
+            if ($campaignData != null) {
+                if ($request->input('startstop') != null) {
+                    $newStatus = $campaignData->status;
+
+                    switch ($request->currstatus) {
+                        case 'ready': $newStatus = 1; break; // ready to running
+                        case 'running': $newStatus = 3; break; // running to paused
+                        case 'paused': $newStatus = 1; break; // paused to running
+                        default: break;
+                    }
+
+                    $campaignData->status = $newStatus;
+                    $campaignData->save();
+
+                    $returnedResponse['code'] = 200;
+                    $returnedResponse['message'] = 'OK';
+                    $returnedResponse['count'] = 1;
+                }
+            }
+            else {
+                $returnedResponse['code'] = 404;
+                $returnedResponse['message'] = 'Campaign not found.';
+            }
+        }
 
         return response()->json($returnedResponse);
     }
@@ -488,7 +517,7 @@ class CampaignController extends Controller
 
         $query = Campaign::select(DB::raw('
                 campaigns.id AS campaign_id, campaigns.unique_key, campaigns.name, campaigns.total_data, campaigns.total_calls, campaigns.created_by,
-                IF (campaigns.status = 0, "Ready", IF (campaigns.status = 1, "Running", "Finished")) AS status,
+                IF (campaigns.status = 0, "Ready", IF (campaigns.status = 1, "Running", IF(campaigns.status = 2, "Finished", "Paused"))) AS status,
                 DATE_FORMAT(campaigns.created_at, "%d/%m/%Y - %H:%i") AS created,
                 (SELECT COUNT(contacts.call_dial) FROM contacts WHERE contacts.campaign_id = campaigns.id AND contacts.call_dial IS NOT NULL) AS call_dial,
                 (SELECT COUNT(contacts.call_connect) FROM contacts WHERE contacts.campaign_id = campaigns.id AND contacts.call_connect IS NOT NULL) AS call_connect

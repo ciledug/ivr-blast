@@ -70,6 +70,18 @@
                     </div>
                   </div>
                 </div>
+
+                <div class="row">
+                  <div class="col-md-12 mt-4">
+                      @if (strtolower($campaign->status) === 'ready')
+                      <button type="button" class="btn btn-success btn-campaign-status" id="btn-start-campaign" data-status-value="ready">Start Campaign</button>
+                      @elseif (strtolower($campaign->status) === 'running')
+                      <button type="button" class="btn btn-danger btn-campaign-status" id="btn-pause-campaign" data-status-value="running">Pause Campaign</button>
+                      @elseif (strtolower($campaign->status) === 'paused')
+                      <button type="button" class="btn btn-success btn-campaign-status" id="btn-resume-campaign" data-status-value="paused">Resume Campaign</button>
+                      @endif
+                  </div>
+                </div>
               </div>
 
               <div class="col-md-6">
@@ -163,8 +175,8 @@
             </div>
 
             <div class="col-md-12 mt-4">
-              <form id="form-campaign-export" class="g-3 needs-validation" method="POST" action="{{ route('campaign.export') }}" enctype="multipart/form-data">
-                <button type="button" class="btn btn-secondary btn-back">Close</button>
+              <form id="form-campaign-export" class="g-3 needs-validation" method="POST" target="_blank" action="{{ route('campaign.export') }}" enctype="multipart/form-data">
+                <a href="{{ route('campaign') }}" class="btn btn-secondary btn-back">Close</a>
                 <button type="button" class="btn btn-success btn-export-as" id="btn-export-excel" data-export-as="excel">Export Excel</button>
                 <button type="button" class="btn btn-danger btn-export-as" id="btn-export-pdf" data-export-as="pdf">Export PDF</button>
                 <input type="hidden" id="campaign-export-type" name="export_type" value="">
@@ -192,10 +204,6 @@
 
     $('#campaign-export-key').val('_{{ $campaign->unique_key }}');
 
-    $('.btn-back').click(function(e) {
-      history.back();
-    });
-
     $('#btn-export-excel').click(function(e) {
       $('#campaign-export-type').val('excel');
       $('#form-campaign-export').submit();
@@ -206,10 +214,9 @@
       $('#form-campaign-export').submit();
     });
 
-    $('#form-campaign-export').submit(function() {
-      $('.btn-back').addClass('disabled');
-      $('#btn-export-excel').addClass('disabled');
-      $('#btn-export-pdf').addClass('disabled');
+    $('.btn-campaign-status').click(function(e) {
+      $('.btn-campaign-status').addClass('disabled');
+      startStopCampaign('{{ $campaign->unique_key }}', $(this).attr('data-status-value'));
     });
   });
 
@@ -309,6 +316,38 @@
           }
         }
       ]
+    });
+  };
+
+  function startStopCampaign(campaignKey, currentStatus) {
+    $.ajax({
+      method: 'PUT',
+      url: '{{ route('campaign.update.startstop') }}',
+      headers: {
+        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+      },
+      data: JSON.stringify({
+        campaign: campaignKey,
+        currstatus: currentStatus,
+        startstop: true,
+        _token: '{{ csrf_token() }}'
+      }),
+      processData: false,
+      contentType: 'application/json',
+      cache: false,
+      success: function(response) {
+        if (response.code === 200) {
+          location.reload();
+        }
+        else {
+          $('.btn-campaign-status').removeClass('disabled');
+        }
+      },
+      error: function(error) {
+        console.log(error.responseText);
+      }
+    })
+    .always(function() {
     });
   };
 </script>

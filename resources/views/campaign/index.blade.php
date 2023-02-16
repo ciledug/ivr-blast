@@ -58,7 +58,7 @@ var campaignList = [];
     // getCampaignList();
   });
 
-  function startStopCampaign(campaignKey) {
+  function startStopCampaign(campaignKey, currentStatus) {
     $.ajax({
       method: 'PUT',
       url: '{{ route('campaign.update.startstop') }}',
@@ -67,14 +67,16 @@ var campaignList = [];
       },
       data: JSON.stringify({
         campaign: campaignKey,
-        startStop: true,
+        currstatus: currentStatus,
+        startstop: true,
         _token: '{{ csrf_token() }}'
       }),
       processData: false,
       contentType: 'application/json',
       cache: false,
       success: function(response) {
-        getCampaignList();
+        // getCampaignList();
+        campaignListContainer.ajax.reload();
       },
       error: function(error) {
         console.log(error.responseText);
@@ -82,7 +84,7 @@ var campaignList = [];
     })
     .always(function() {
     });
-  }
+  };
  
   /*
   function prepareCampaignListTable() {
@@ -211,13 +213,14 @@ var campaignList = [];
             var rowStatus = row.status.toLowerCase();
 
             switch (rowStatus) {
-              case 'running': titleStartStop = 'Stop'; btnStartStopCss = ' btn-danger'; btnEditCss = ' btn-outline-warning disabled'; btnDeleteCss = ' btn-outline-danger disabled'; break;
+              case 'running': titleStartStop = 'Pause'; btnStartStopCss = ' btn-danger'; btnEditCss = ' btn-outline-warning disabled'; btnDeleteCss = ' btn-outline-danger disabled'; break;
+              case 'paused': titleStartStop = 'Resume'; btnDeleteCss = ' btn-outline-danger disabled'; break;
               case 'finished': btnStartStopCss += ' btn-outline-success disabled'; btnEditCss = ' btn-outline-warning disabled'; btnDeleteCss = ' btn-outline-danger disabled'; break;
               case 'ready':
               default: break;
             }
 
-            tempContent += '<button type="button" class="btn btn-sm' + btnStartStopCss + ' btn-start-stop" data-key="_' + row.key + '" onclick="startStopCampaign(\'' + row.key + '\')">' + titleStartStop + '</button>';
+            tempContent += '<button type="button" class="btn btn-sm' + btnStartStopCss + ' btn-start-stop" data-key="_' + row.key + '" onclick="startStopCampaign(\'' + row.key + '\', \'' + rowStatus + '\')">' + titleStartStop + '</button>';
             tempContent += '&nbsp;<a href="{{ route('campaign.show') }}/_' + row.key + '" class="btn btn-sm btn-info">Detail</a>';
 
             if (row.progress <= 0) {
@@ -230,7 +233,7 @@ var campaignList = [];
         },
       ]
     });
-  }
+  };
 
 
 </script>
