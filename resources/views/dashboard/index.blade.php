@@ -4,12 +4,14 @@
 <main id="main" class="main">
   <div class="pagetitle">
     <h1>Dashboard</h1>
+    <!--
     <nav>
       <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="index.html">Home</a></li>
         <li class="breadcrumb-item active">Dashboard</li>
       </ol>
     </nav>
+    -->
   </div>
   
   <section class="section dashboard">
@@ -18,7 +20,6 @@
       <!-- Left side columns -->
       <div class="col-lg-8">
         <div class="row">
-
           <div class="card">
             <div class="card-body">
               <h5 class="card-title">Running Campaigns</h5>
@@ -30,6 +31,15 @@
                     <th scope="col">Call Progress (%)</th>
                   </tr>
                 </thead>
+                <tbody>
+                  @foreach ($campaigns AS $campaign)
+                  <tr>
+                    <td scope="col"></td>
+                    <td scope="col">{{ $campaign['name'] }}</td>
+                    <td scope="col">{{ $campaign['progress'] }}</td>
+                  </tr>
+                  @endforeach
+                </tbody>
               </table>
             </div>
           </div>
@@ -61,25 +71,34 @@
   $(document).ready(function() {
     prepareTableContainer();
     prepareChart('chart-total-calls');
-    getCampaignList(dataTableContainer);
-    getCallStatus();
   });
 
   function prepareTableContainer() {
     dataTableContainer = $('#table-running-campaign-list-container').DataTable({
+      processing: true,
+      lengthMenu: [5, 10, 15, 20, 50, 100],
+      pageLength: 10,
+      responsive: true,
       columns: [
-        { data: 'seq' },
+        { data: null },
         { data: 'name' },
         { data: 'progress' },
       ],
       columnDefs: [
+        {
+          targets: 0,
+          orderable: false,
+          render: function(data, type, row, meta) {
+            return ++meta.row + '.';
+          }
+        },
         {
           targets: 2,
           className: 'dt-body-right',
         }
       ],
     });
-  }
+  };
 
   function prepareChart(chartContainer) {
     callsChart = echarts.init(document.getElementById(chartContainer));
@@ -109,84 +128,15 @@
         labelLine: {
           show: false
         },
-        data: []
+        data: [
+          { value: {{ $answered }}, name: 'Answered' },
+          { value: {{ $noanswer }}, name: 'No Answer' },
+          { value: {{ $busy }}, name: 'Busy' },
+          { value: {{ $failed }}, name: 'Failed' },
+        ]
       }]
     });
-  }
-
-  function getCampaignList(dataTableContainer) {
-    $.ajax({
-      type: 'GET',
-      url: '{{ route('campaign.list') }}',
-      headers: {
-        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-      },
-      processData: false,
-      contentType: false,
-      cache: false,
-      success: function(response) {
-        dataTableContainer.clear();
-        dataTableContainer.rows.add(response.data);
-        dataTableContainer.draw();
-      },
-      error: function(error) {
-        console.log(error.responseText);
-      }
-    })
-    .always(function() {
-    });
-  }
-
-  function getCallStatus() {
-    $.ajax({
-      type: 'GET',
-      url: '{{ route('call.status') }}',
-      headers: {
-        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-      },
-      processData: false,
-      contentType: false,
-      cache: false,
-      success: function(response) {
-        if (response.code === 200) {
-          var tempData = [];
-          var tempName = '';
-          var tempValue = 0;
-
-          for (var key in response.data) {
-            if (response.data[key[0]].cr_0 != undefined) {
-              tempName = 'Answered'; tempValue = response.data[key[0]].cr_0;
-            }
-            else if (response.data[key[0]].cr_1 != undefined) {
-              tempName = 'No Answer'; tempValue = response.data[key[0]].cr_1;
-            }
-            else if (response.data[key[0]].cr_2 != undefined) {
-              tempName = 'Busy'; tempValue = response.data[key[0]].cr_2;
-            }
-            else if (response.data[key[0]].cr_3 != undefined) {
-              tempName = 'Failed'; tempValue = response.data[key[0]].cr_3;
-            }
-
-            tempData.push({
-              value: tempValue,
-              name: tempName
-            });
-          };
-
-          callsChart.setOption({
-            series: [{
-              data: tempData
-            }]
-          });
-        }
-      },
-      error: function(error) {
-        console.log(error.responseText);
-      }
-    })
-    .always(function() {
-    });
-  }
+  };
 </script>
 @endpush
 

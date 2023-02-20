@@ -63,10 +63,10 @@
                 <div class="row">
                   <div class="col-md-12 mt-2">
                     <div class="row">
-                      <div class="col-lg-3 col-md-4 label">Created Date</div>
+                      <div class="col-lg-5 col-md-4 label">Created Date</div>
                     </div>
                     <div class="row">
-                      <div id="dialog-detail-campaign-created-date" class="col-lg-9 col-md-8 h5">{{ $campaign->created_at }}</div>
+                      <div id="dialog-detail-campaign-created-date" class="col-lg-7 col-md-8 h5">{{ $campaign->created_at }}</div>
                     </div>
                   </div>
                 </div>
@@ -79,7 +79,7 @@
                       <div class="col-lg-4 col-md-4 label">Date Started</div>
                     </div>
                     <div class="row">
-                      <div id="dialog-detail-campaign-date-started" class="col-lg-8 col-md-8 h5"></div>
+                      <div id="dialog-detail-campaign-date-started" class="col-lg-8 col-md-8 h5">{{ $campaign->started }}</div>
                     </div>
                   </div>
                 </div>
@@ -90,7 +90,7 @@
                       <div class="col-lg-4 col-md-4 label">Date Finished</div>
                     </div>
                     <div class="row">
-                      <div id="dialog-detail-campaign-date-finished" class="col-lg-8 col-md-8 h5"></div>
+                      <div id="dialog-detail-campaign-date-finished" class="col-lg-8 col-md-8 h5">{{ $campaign->finished }}</div>
                     </div>
                   </div>
                 </div>
@@ -101,7 +101,7 @@
                       <div class="col-lg-4 col-md-4 label">Total Calls</div>
                     </div>
                     <div class="row">
-                      <div id="dialog-detail-campaign-total-calls" class="col-lg-8 col-md-8 h5"></div>
+                      <div id="dialog-detail-campaign-total-calls" class="col-lg-8 col-md-8 h5">{{ $campaign->total_calls }}</div>
                     </div>
                   </div>
                 </div>
@@ -112,7 +112,7 @@
                       <div class="col-lg-4 col-md-4 label">Success Calls</div>
                     </div>
                     <div class="row">
-                      <div id="dialog-detail-campaign-success-calls" class="col-lg-8 col-md-8 h5"></div>
+                      <div id="dialog-detail-campaign-success-calls" class="col-lg-8 col-md-8 h5">{{ $campaign->success }}</div>
                     </div>
                   </div>
                 </div>
@@ -123,7 +123,7 @@
                       <div class="col-lg-4 col-md-4 label">Failed Calls</div>
                     </div>
                     <div class="row">
-                      <div id="dialog-detail-campaign-failed-calls" class="col-lg-8 col-md-8 h5"></div>
+                      <div id="dialog-detail-campaign-failed-calls" class="col-lg-8 col-md-8 h5">{{ $campaign->failed }}</div>
                     </div>
                   </div>
                 </div>
@@ -134,7 +134,7 @@
                       <div class="col-lg-5 col-md-4 label">Campaign Progress (%)</div>
                     </div>
                     <div class="row">
-                      <div id="dialog-detail-campaign-progress" class="col-lg-7 col-md-8 h5"></div>
+                      <div id="dialog-detail-campaign-progress" class="col-lg-7 col-md-8 h5">{{ $campaign->progress }}</div>
                     </div>
                   </div>
                 </div>
@@ -167,12 +167,14 @@
               <form id="form-delete-campaign" method="POST" action="{{ route('campaign.destroy') }}">
                 <button type="button" class="btn btn-secondary btn-back">Cancel</button>
                 <button type="submit" class="btn btn-danger" id="btn-delete-campaign">Delete</button>
+                &nbsp;<div id="submit-spinner-delete-campaign" class="spinner-border spinner-border-sm text-primary" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
                 <input type="hidden" id="input-delete-campaign" name="campaign" value="_{{ $campaign->unique_key }}">
                 {{ csrf_field() }}
                 <input type="hidden" id="input-delete-method" name="_method" value="DELETE">
               </form>
             </div>
-
           </div>
         </div>
 
@@ -190,6 +192,8 @@
     prepareContactListTable();
     getContactList();
 
+    $('#submit-spinner-delete-campaign').hide();
+
     $('.btn-back').click(function(e) {
       history.back();
     });
@@ -197,11 +201,15 @@
     $('#form-delete-campaign').submit(function() {
       $('.btn-back').addClass('disabled');
       $('#btn-delete-campaign').addClass('disabled');
+      $('#submit-spinner-delete-campaign').show();
     });
   });
 
   function prepareContactListTable() {
     contactDataContainer = $('#table-contact-list-container').DataTable({
+      processing: true,
+      lengthMenu: [5, 10, 15, 20, 50, 100],
+      pageLength: 10,
       columns: [
         { data: 'account_id' },
         { data: 'name' },
@@ -223,7 +231,7 @@
           data: null,
           render: function(data, type, row, meta) {
             contactList['_' + row.account_id] = row;
-            var tempContent = '<a href="{{ route('contact.show') }}/_' + row.account_id + '" class="btn btn-sm btn-info">Detail</a>';
+            var tempContent = '<a href="{{ route('contact.show') }}/_' + row.account_id + '/{{ $campaign->id }}" class="btn btn-sm btn-info">Detail</a>';
             return tempContent;
           }
         }

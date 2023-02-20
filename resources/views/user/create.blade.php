@@ -80,6 +80,9 @@
               <div class="col-md-12 mt-4">
                 <button type="button" id="btn-cancel-create-user" class="btn btn-secondary btn-back">Cancel</button>
                 <button type="submit" id="btn-submit-create-user" class="btn btn-primary">Save</button>
+                &nbsp;<div id="submit-spinner" class="spinner-border spinner-border-sm text-primary" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
               </div>
             </form>
 
@@ -94,13 +97,27 @@
 @push('javascript')
 <script type="text/javascript">
   $(document).ready(function(e) {
+    $('#submit-spinner').hide();
+
     $('.btn-back').click(function(e) {
       history.back();
     });
 
     $('#form-create-user').submit(function() {
+      var isOkProceed = true;
+
+      if (
+        ($('#input-user-name').val().length < 5) || ($('#input-user-username').val().length < 5) ||
+        ($('#input-user-password').val().length < 6) || ($('#input-user-confirm-password').val().length < 6)
+      ) {
+        isOkProceed = false;
+      }
+
+      if (!isOkProceed) return isOkProceed;
+      
       $('.btn-back').addClass('disabled');
       $('#btn-submit-create-user').addClass('disabled');
+      $('#submit-spinner').show();
     });
   });
 </script>

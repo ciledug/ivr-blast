@@ -23,7 +23,7 @@ class CreateCampaignTable extends Migration
             $table->string('excel_name', 100)->default(null)->nullable();
             $table->integer('total_data')->unsigned()->default(0)->nullable();
             $table->smallInteger('total_calls')->unsigned()->default(0)->nullable();
-            $table->tinyInteger('status')->unsigned()->default(false)->nullable()->comment('0:ready, 1:running, 2:finished, 3:paused');
+            $table->string('status', 10)->default('ready')->nullable()->comment('ready, running, finished, paused');
             $table->string('created_by', 100)->default(null)->nullable();
             $table->timestamps();
             $table->softDeletes();

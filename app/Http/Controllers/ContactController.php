@@ -20,9 +20,11 @@ class ContactController extends Controller
     {
     }
 
-    public function show(Request $request)
+    public function show(Request $request, $contact=null, $campaign=null)
     {
-        $data = array();
+        $data = array(
+            'contact' => array()
+        );
 
         $contact = Contact::select([
                 'contacts.id', 'contacts.account_id', 'contacts.name', 'contacts.phone', 'contacts.bill_date', 'contacts.due_date', 'contacts.nominal',
@@ -30,25 +32,18 @@ class ContactController extends Controller
                 'call_logs.call_duration', 'call_logs.call_response'
             ])
             ->leftJoin('call_logs', 'call_logs.contact_id', '=', 'contacts.id')
-            ->where('contacts.campaign_id', '=', $request->campaign)
-            ->where('contacts.account_id', '=', Str::replaceFirst('_', '', $request->contact))
-            ->whereNull('contacts.deleted_at')
+            ->where('contacts.campaign_id', '=', $campaign)
+            ->where('contacts.account_id', '=', Str::replaceFirst('_', '', $contact))
             ->orderBy('call_logs.created_at', 'DESC')
             ->first();
 
         if ($contact) {
             $contact->nominal = number_format($contact->nominal, 0, ',', '.');
-            $contact->call_response = 0;
-
-            if ($contact->call_response == 0) $contact->call_response = 'Answered';
-            else if ($contact->call_response == 1) $contact->call_response = 'No Answer';
-            else if ($contact->call_response == 2) $contact->call_response = 'Busy';
-            else $contact->call_response = 'Failed';
-
+            $contact->call_response = ucwords($contact->call_response);
             $data['contact'] = $contact;
         }
         
-        // dd($contact);
+        // dd($data);
         return view('contact.show', $data);
     }
 
@@ -110,13 +105,7 @@ class ContactController extends Controller
                     DATE_FORMAT(call_connect, "%d/%m/%Y %H:%i:%s") AS call_connect,
                     DATE_FORMAT(call_disconnect, "%d/%m/%Y %H:%i:%s") AS call_disconnect,
                     DATE_FORMAT(call_duration, "%d/%m/%Y %H:%i:%s") AS call_duration,
-                    IF(call_response=0, "Answered",
-                    IF(call_response=1, "No Answer",
-                        IF(call_response=2, "Busy",
-                        IF(call_response=3, "Failed", NULL)
-                        )
-                    )
-                    ) AS call_response
+                    CONCAT(UCASE(LEFT(call_response, 1)), SUBSTRING(call_response, 2)) AS call_response
                 '))
                 ->offset($START)
                 ->limit($LENGTH)

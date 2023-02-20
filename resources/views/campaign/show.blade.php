@@ -200,7 +200,6 @@
 
   $(document).ready(function() {
     prepareContactListTable();
-    // getContactList();
 
     $('#campaign-export-key').val('_{{ $campaign->unique_key }}');
 
@@ -220,65 +219,12 @@
     });
   });
 
-  // function prepareContactListTable() {
-  //   contactDataContainer = $('#table-contact-list-container').DataTable({
-  //     columns: [
-  //       { data: 'account_id' },
-  //       { data: 'name' },
-  //       { data: 'phone' },
-  //       { data: 'bill_date' },
-  //       { data: 'due_date' },
-  //       { data: 'nominal' },
-  //       { data: 'call_dial' },
-  //       { data: 'call_response' },
-  //     ],
-  //     columnDefs: [
-  //       {
-  //         targets: 5,
-  //         data: 'nominal',
-  //         className: 'dt-body-right'
-  //       },
-  //       {
-  //         targets: 8,
-  //         data: null,
-  //         render: function(data, type, row, meta) {
-  //           contactList['_' + row.account_id] = row;
-  //           var tempContent = '<a href="{{ route('contact.show') }}/_' + row.account_id + '/{{ $campaign->id }}" class="btn btn-sm btn-info">Detail</a>';
-  //           return tempContent;
-  //         }
-  //       }
-  //     ]
-  //   });
-  // };
-
-  // function getContactList() {
-  //   $.ajax({
-  //     method: 'GET',
-  //     url: "{{ route('contact.list') }}/{{ $campaign->unique_key }}",
-  //     headers: {
-  //       'X-CSRF-TOKEN': '{{ csrf_token() }}'
-  //     },
-  //     processData: false,
-  //     contentType: false,
-  //     cache: false,
-  //     success: function(response) {
-  //       contactDataContainer.clear();
-  //       contactDataContainer.rows.add(response.data);
-  //       contactDataContainer.draw();
-  //     },
-  //     error: function(error) {
-  //       console.log(error.responseText);
-  //     }
-  //   })
-  //   .always(function() {
-  //   });
-  // };
-
   function prepareContactListTable() {
     contactDataContainer = $('#table-contact-list-container').DataTable({
       processing: true,
+      lengthMenu: [5, 10, 15, 20, 50, 100],
+      pageLength: 10,
       serverSide: true,
-      lengthMenu: [5, 10, 15, 20],
       ajax: {
         url: '{{ route('contact.list.ajax') }}',
         type: 'POST',

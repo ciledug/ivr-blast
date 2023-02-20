@@ -85,93 +85,14 @@ var campaignList = [];
     .always(function() {
     });
   };
- 
-  /*
-  function prepareCampaignListTable() {
-    campaignListContainer = $('#table-campaign-list-container').DataTable({
-      columns: [
-        { data: null },
-        { data: 'created' },
-        { data: 'name' },
-        { data: 'total' },
-        { data: 'status' },
-        { data: 'created_by' }
-      ],
-      columnDefs: [
-        {
-          targets: 0,
-          render: function(data, type, row, meta) {
-            return ++meta.row + '.';
-          }
-        },
-        {
-          targets: 3,
-          className: 'dt-body-right'
-        },
-        {
-          targets: 6,
-          data: null,
-          render: function(data, type, row, meta) {
-            campaignList['_' + row.key] = row;
-
-            var tempContent = '';
-            var titleStartStop = 'Start';
-            var btnStartStopCss = ' btn-success';
-            var btnEditCss = ' btn-warning';
-            var btnDeleteCss = ' btn-danger';
-            var rowStatus = row.status.toLowerCase();
-
-            switch (rowStatus) {
-              case 'running': titleStartStop = 'Stop'; btnStartStopCss = ' btn-danger'; btnEditCss = ' btn-outline-warning disabled'; btnDeleteCss = ' btn-outline-danger disabled'; break;
-              case 'finished': btnStartStopCss += ' btn-outline-success disabled'; btnEditCss = ' btn-outline-warning disabled'; btnDeleteCss = ' btn-outline-danger disabled'; break;
-              case 'ready':
-              default: break;
-            }
-
-            tempContent += '<button type="button" class="btn btn-sm' + btnStartStopCss + ' btn-start-stop" data-key="_' + row.key + '" onclick="startStopCampaign(\'' + row.key + '\')">' + titleStartStop + '</button>';
-            tempContent += '&nbsp;<a href="{{ route('campaign.show') }}/_' + row.key + '" class="btn btn-sm btn-info">Detail</a>';
-
-            if (row.progress <= 0) {
-              tempContent += '&nbsp;<a href="{{ route('campaign.edit') }}/_' + row.key + '" class="btn btn-sm' + btnEditCss + '">Edit</a>';
-            }
-            
-            tempContent += '&nbsp;<a href="{{ route('campaign.delete') }}/_' + row.key + '" class="btn btn-sm' + btnDeleteCss + '">Delete</a>';
-            return tempContent;
-          }
-        },
-      ]
-    });
-  }
-
-  function getCampaignList() {
-    $.ajax({
-      type: 'GET',
-      url: '{{ route('campaign.list') }}',
-      headers: {
-        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-      },
-      processData: false,
-      contentType: false,
-      cache: false,
-      success: function(response) {
-        campaignListContainer.clear();
-        campaignListContainer.rows.add(response.data);
-        campaignListContainer.draw();
-      },
-      error: function(error) {
-        console.log(error.responseText);
-      }
-    })
-    .always(function() {
-    });
-  }
-  */
 
   function prepareCampaignListTable() {
     campaignListContainer = $('#table-campaign-list-container').DataTable({
       processing: true,
-      serverSide: true,
+      lengthMenu: [5, 10, 15, 20, 50, 100],
+      pageLength: 10,
       responsive: true,
+      serverSide: true,
       ajax: {
         url: '{{ route('campaign.list.ajax') }}',
         type: 'POST',
@@ -234,8 +155,6 @@ var campaignList = [];
       ]
     });
   };
-
-
 </script>
 @endpush
 

@@ -40,11 +40,19 @@
                   <input type="password" class="form-control" id="input-reset-confirm-password" name="password_confirmation" minlength="6" maxlength="15" placeholder="Confirm Password (min. 6 chars)" required>
                   <label for="input-user-confirm-password">Confirm Password (min. 6 chars)</label>
                 </div>
+                @if ($errors->has('password'))
+                <div class="invalid-feedback" style="display:block">
+                  {{ $errors->first('password') }}
+                </div>
+                @endif
               </div>
 
               <div class="col-md-12 mt-4">
                 <button type="button" id="btn-cancel-reset-password" class="btn btn-secondary btn-back">Cancel</button>
                 <button type="submit" id="btn-submit-reset-password" class="btn btn-primary">Save</button>
+                &nbsp;<div id="submit-spinner" class="spinner-border spinner-border-sm text-primary" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
                 <input type="hidden" id="input-reset-user" name="user" value="_{{ $user->username}}">
                 <input type="hidden" id="input-reset-method" name="_method" value="PUT">
               </div>
@@ -60,13 +68,24 @@
 
 @push('javascript')
 <script type="text/javascript">
+  $('#submit-spinner').hide();
+
   $('.btn-back').click(function(e) {
     history.back();
   });
 
   $('#form-reset-password').submit(function() {
+    var isOkProceed = true;
+
+    if (($('#input-reset-password').val().length < 6) || ($('#input-reset-confirm-password').val().length < 6)) {
+      isOkProceed = false;
+    }
+
+    if (!isOkProceed) return isOkProceed;
+
     $('.btn-back').addClass('disabled');
     $('#btn-submit-reset-password').addClass('disabled');
+    $('#submit-spinner').show();
   });
 </script>
 @endpush

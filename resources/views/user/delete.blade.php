@@ -51,6 +51,9 @@
               <div class="col-md-12 mt-4">
                 <button type="button" id="btn-cancel-delete-user" class="btn btn-secondary btn-back">Cancel</button>
                 <button type="submit" id="btn-submit-delete-user" class="btn btn-danger">Delete</button>
+                &nbsp;<div id="submit-spinner" class="spinner-border spinner-border-sm text-primary" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
                 <input type="hidden" id="input-delete-user" name="user" value="_{{ $user->username or ''}}">
                 <input type="hidden" name="_method" value="DELETE">
               </div>
@@ -67,6 +70,8 @@
 @push('javascript')
 <script type="text/javascript">
   $(document).ready(function(e) {
+    $('#submit-spinner').hide();
+
     $('.btn-back').click(function(e) {
       history.back();
     });
@@ -74,6 +79,7 @@
     $('#form-delete-user').submit(function() {
       $('.btn-back').addClass('disabled');
       $('#btn-submit-delete-user').addClass('disabled');
+      $('#submit-spinner').show();
     });
   });
 </script>

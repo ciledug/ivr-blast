@@ -30,7 +30,7 @@
               <div class="col-md-12">
                 <div class="form-floating">
                     <input type="text" class="form-control" id="input-user-name" name="name" minlength="5" maxlength="30" placeholder="Name" value="{{ $user->name or '' }}" required>
-                    <label for="input-user-name">Name</label>
+                    <label for="input-user-name">Name (min. 5 chars)</label>
                 </div>
               </div>
 
@@ -61,6 +61,9 @@
               <div class="col-md-12 mt-4">
                 <button type="button" id="btn-cancel-update-user" class="btn btn-secondary btn-back">Cancel</button>
                 <button type="submit" id="btn-submit-update-user" class="btn btn-primary">Save</button>
+                &nbsp;<div id="submit-spinner" class="spinner-border spinner-border-sm text-primary" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
                 <input type="hidden" id="input-user-user" name="user" value="_{{ $user->username or ''}}">
                 <input type="hidden" name="_method" value="PUT">
               </div>
@@ -77,20 +80,20 @@
 @push('javascript')
 <script type="text/javascript">
   $(document).ready(function(e) {
+    $('#submit-spinner').hide();
+
     $('.btn-back').click(function(e) {
       history.back();
     });
 
     $('#form-update-user').submit(function() {
-      if (
-        $('#input-user-name').val().trim() === ''
-        || $('#input-user-username').val().trim() === ''
-      ) {
+      if (($('#input-user-name').val().trim().length < 5) || ($('#input-user-username').val().trim().length < 5)) {
         return false;
       }
 
       $('.btn-back').addClass('disabled');
       $('#btn-submit-update-user').addClass('disabled');
+      $('#submit-spinner').show();
     });
   });
 </script>

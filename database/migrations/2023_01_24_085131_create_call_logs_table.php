@@ -23,7 +23,7 @@ class CreateCallLogsTable extends Migration
             $table->datetime('call_connect')->default(null)->nullable();
             $table->datetime('call_disconnect')->default(null)->nullable();
             $table->datetime('call_duration')->default(null)->nullable();
-            $table->tinyInteger('call_response')->unsigned()->default(null)->nullable()->comment('0:answered, 1:no_answer, 2:busy, 3:failed');
+            $table->string('call_response', 10)->default(null)->nullable()->comment('answered, no_answer, busy, failed');
             $table->timestamps();
             $table->softDeletes();
         });

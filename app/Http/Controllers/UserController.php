@@ -324,7 +324,6 @@ class UserController extends Controller
         }
 
         $user = User::where('username', '=', Str::replaceFirst('_', '', $request->user))
-            ->whereNull('deleted_at')
             ->first();
 
         if ($user) {

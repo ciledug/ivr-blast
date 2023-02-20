@@ -33,7 +33,6 @@ class AccountController extends Controller
         }
         
         $user = User::where('username', '=', Auth::user()->username)
-            ->whereNull('deleted_at')
             ->first();
 
         if ($user) {
@@ -73,7 +72,9 @@ class AccountController extends Controller
 
             if ($saveOk) {
                 $user->save();
-                return back();
+                return back()->with([
+                    'profile_changed_ok' => 'Profile has been changed!'
+                ]);
             }
             else {
                 return back()->withErrors($validator)->withInput();
@@ -96,14 +97,15 @@ class AccountController extends Controller
         }
 
         $user = User::where('username', '=', Auth::user()->username)
-            ->whereNull('deleted_at')
             ->first();
 
         if ($user) {
             if (Hash::check($request->old_password, $user->password)) {
                 $user->password = Hash::make($request->password);
                 $user->save();
-                return back();
+                return back()->with([
+                    'password_changed_ok' => 'Password has been changed!',
+                ]);
             }
             else {
                 $validator->errors()->add('old_password', 'Password incorrect!');

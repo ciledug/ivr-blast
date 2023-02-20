@@ -27,6 +27,7 @@ Route::group(
             Route::get('show/{campaign?}', "CampaignController@show")->name('campaign.show');
             Route::get('edit/{campaign?}', "CampaignController@edit")->name('campaign.edit');
             Route::get('delete/{campaign?}', "CampaignController@delete")->name('campaign.delete');
+            Route::get('template', "CampaignController@downloadTemplate")->name('campaign.template');
     
             Route::get('list', 'CampaignController@getCampaignList')->name('campaign.list');
             Route::post('list/ajax', 'CampaignController@getCampaignListAjax')->name('campaign.list.ajax');
@@ -36,6 +37,7 @@ Route::group(
             Route::delete('/', 'CampaignController@destroy')->name('campaign.destroy');
     
             Route::post('export', 'CampaignController@exportData')->name('campaign.export');
+            Route::post('export/failed', 'CampaignController@exportFailedContacts')->name('campaign.export.failed');
         });
         
         Route::prefix('user')->group(function() {
