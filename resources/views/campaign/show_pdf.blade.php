@@ -82,11 +82,12 @@
                 <th scope="col">Account ID</th>
                 <th scope="col">Name</th>
                 <th scope="col">Phone</th>
-                <th scope="col">Bill Date</th>
-                <th scope="col">Due Date</th>
-                <th scope="col">Nominal (Rp.)</th>
-                <th scope="col">Call Date</th>
-                <th scope="col">Call Response</th>
+                <th scope="col">Bill<br>Date</th>
+                <th scope="col">Due<br>Date</th>
+                <th scope="col">Nominal<br>(Rp.)</th>
+                <th scope="col">Call<br>Date</th>
+                <th scope="col">Call<br>Response</th>
+                <th scope="col">Total<br>Calls</th>
               </tr>
 
               @foreach($contacts AS $contact)
@@ -100,6 +101,7 @@
                 <td style="text-align:right;">{{ number_format($contact->NOMINAL, 0, ',', '.') }}</td>
                 <td>{{ $contact->CALL_DATE }}</td>
                 <td>{{ $contact->CALL_RESPONSE }}</td>
+                <td style="text-align:right;">{{ number_format($contact->TOTAL_CALLS, 0, ',', '.') }}</td>
               </tr>
               @endforeach
 

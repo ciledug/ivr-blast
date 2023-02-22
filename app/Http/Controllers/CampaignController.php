@@ -345,6 +345,8 @@ class CampaignController extends Controller
         $contacts = array();
 
         if ($campaign) {
+            $campaign->total_calls = 0;
+            
             $contacts = Contact::select(DB::raw("
                     campaigns.name AS CAMPAIGN_NAME,
                     contacts.id,
@@ -353,7 +355,8 @@ class CampaignController extends Controller
                     contacts.phone AS CONTACT_PHONE,
                     contacts.bill_date AS BILL_DATE,
                     contacts.due_date AS DUE_DATE,
-                    contacts.nominal AS NOMINAL
+                    contacts.nominal AS NOMINAL,
+                    IF (contacts.total_calls IS NULL, 0, contacts.total_calls) AS TOTAL_CALLS
                 "))
                 ->leftJoin('campaigns', 'contacts.campaign_id', '=', 'campaigns.id')
                 ->where('contacts.campaign_id', '=', $campaign->id)
@@ -366,10 +369,13 @@ class CampaignController extends Controller
                     ->where('contact_id', '=', $valueContact->id)
                     ->orderBy('id', 'DESC')
                     ->first();
+
                 if ($tempCallLog) {
                     $contacts[$keyContact]['CALL_DATE'] = $tempCallLog->call_dial;
                     $contacts[$keyContact]['CALL_RESPONSE'] = ucwords($tempCallLog->call_response);
                 }
+
+                $campaign->total_calls += $contacts[$keyContact]['TOTAL_CALLS'];
                 unset($contacts[$keyContact]['id']);
             }
 
@@ -390,11 +396,49 @@ class CampaignController extends Controller
                 return $pdf->download($fileName . '.pdf');
             }
             else if ($request->export_type === 'excel') {
-                Excel::create($fileName, function($excel) use($contacts) {
-                    $excel->sheet('contacts', function($sheet) use($contacts) {
-                        $sheet->fromArray($contacts);
-                    });
-                })->export('xlsx');
+                // -- download plain excel ...
+                // Excel::create($fileName, function($excel) use($contacts) {
+                //     $excel->sheet('contacts', function($sheet) use($contacts) {
+                //         $sheet->fromArray($contacts);
+                //     });
+                // })->export('xlsx');
+
+                // -- download via template and rename the downloaded file name
+                // $excelDownload = storage_path('app/public/files/' . $fileName . '.xlsx');
+                // copy(
+                //     storage_path('app/public/files/template_report_campaign_ivr_blast.xlsx'),
+                //     $excelDownload
+                // );
+
+                $excelDownload = storage_path('app/public/files/Report_IVR_Blast.xlsx');
+
+                Excel::load($excelDownload, function($file) use($campaign, $contacts, $excelDownload) {
+                    $sheet = $file->setActiveSheetIndex(0);
+                    $sheet->setCellValue('A2', $campaign->name);
+                    $sheet->setCellValue('E2', $campaign->started);
+                    $sheet->setCellValue('A5', $campaign->total_data);
+                    $sheet->setCellValue('E5', $campaign->finished);
+                    $sheet->setCellValue('A8', $campaign->status);
+                    $sheet->setCellValue('E8', $campaign->total_calls);
+                    $sheet->setCellValue('A11', $campaign->created_at);
+                    $sheet->setCellValue('E11', $campaign->success);
+                    $sheet->setCellValue('A14', $campaign->progress);
+                    $sheet->setCellValue('E14', $campaign->failed);
+
+                    $excelRowNumber = 17;
+                    foreach ($contacts AS $keyContact => $valueContact) {
+                        $sheet->setCellValue('A' . $excelRowNumber, (string) $valueContact['ACCOUNT_ID']);
+                        $sheet->setCellValue('B' . $excelRowNumber, $valueContact['CONTACT_NAME']);
+                        $sheet->setCellValue('C' . $excelRowNumber, $valueContact['CONTACT_PHONE']);
+                        $sheet->setCellValue('D' . $excelRowNumber, $valueContact['BILL_DATE']);
+                        $sheet->setCellValue('E' . $excelRowNumber, $valueContact['DUE_DATE']);
+                        $sheet->setCellValue('F' . $excelRowNumber, $valueContact['NOMINAL']);
+                        $sheet->setCellValue('G' . $excelRowNumber, $valueContact['TOTAL_CALLS']);
+                        $sheet->setCellValue('H' . $excelRowNumber, $valueContact['CALL_DATE']);
+                        $sheet->setCellValue('I' . $excelRowNumber, $valueContact['CALL_RESPONSE']);
+                        $excelRowNumber++;
+                    }
+                })->download('xlsx');
             }
         }
         else {

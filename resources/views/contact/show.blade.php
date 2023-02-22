@@ -136,7 +136,7 @@
                       <div class="col-lg-6 col-md-4 label">Call Disconnect</div>
                     </div>
                     <div class="row">
-                      <div class="col-lg-6 col-md-8 h5" id="dialog-detail-contact-call-disconnect">{{ $contact->call_disconnect or '-' }}</div>
+                      <div class="col-lg-8 col-md-8 h5" id="dialog-detail-contact-call-disconnect">{{ $contact->call_disconnect or '-' }}</div>
                     </div>
                   </div>
                 </div>
@@ -163,11 +163,22 @@
                   </div>
                 </div>
 
+                <div class="row">
+                  <div class="col-md-12 mt-2">
+                    <div class="row">
+                      <div class="col-lg-5 col-md-4 label">Total Calls</div>
+                    </div>
+                    <div class="row">
+                      <div class="col-lg-7 col-md-8 h5" id="dialog-detail-contact-total-calls">{{ $contact->total_calls or '0' }}</div>
+                    </div>
+                  </div>
+                </div>
+
               </div>
             </div>
 
             <div class="row mt-4">
-              <button type="button" class="btn btn-secondary btn-lg btn-back" data-bs-dismiss="modal">Close</button>
+              <button type="button" class="btn btn-secondary btn-lg btn-block btn-back" data-bs-dismiss="modal">Close</button>
             </div>
 
           </div>

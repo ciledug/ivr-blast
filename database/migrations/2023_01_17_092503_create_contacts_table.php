@@ -24,6 +24,7 @@ class CreateContactsTable extends Migration
             $table->string('phone', 15);
             $table->date('bill_date')->nullable();
             $table->date('due_date')->nullable();
+            $table->integer('total_calls')->nullable();
             $table->integer('nominal')->unsigned();
 			$table->integer('extension')->nullable();
 			$table->string('callerid')->nullable();

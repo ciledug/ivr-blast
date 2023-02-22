@@ -170,6 +170,7 @@
                     <th scope="col">Nominal</th>
                     <th scope="col">Call Date</th>
                     <th scope="col">Call Response</th>
+                    <th scope="col">Total Calls</th>
                     <th scope="col">Action</th>
                   </tr>
                 </thead>
@@ -246,15 +247,19 @@
         { data: 'nominal' },
         { data: 'call_dial' },
         { data: 'call_response' },
+        { data: 'total_calls' },
       ],
       columnDefs: [
         {
           targets: 5,
-          data: 'nominal',
           className: 'dt-body-right'
         },
         {
           targets: 8,
+          className: 'dt-body-right'
+        },
+        {
+          targets: 9,
           orderable: false,
           data: null,
           render: function(data, type, row, meta) {

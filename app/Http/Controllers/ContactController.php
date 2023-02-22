@@ -28,7 +28,7 @@ class ContactController extends Controller
         );
 
         $contact = Contact::select([
-                'contacts.id', 'contacts.account_id', 'contacts.name', 'contacts.phone', 'contacts.bill_date', 'contacts.due_date', 'contacts.nominal',
+                'contacts.id', 'contacts.account_id', 'contacts.name', 'contacts.phone', 'contacts.bill_date', 'contacts.due_date', 'contacts.total_calls', 'contacts.nominal',
                 'call_logs.call_dial', 'call_logs.call_connect', 'call_logs.call_disconnect', 'call_logs.call_duration', 'call_logs.call_response'
             ])
             ->leftJoin('call_logs', 'call_logs.contact_id', '=', 'contacts.id')
@@ -52,9 +52,12 @@ class ContactController extends Controller
 
         $returnedCode = 500;
         $command = Contact::select(DB::raw('
-                account_id, contacts.name AS name, phone,
+                account_id,
+                contacts.name AS name,
+                phone,
                 DATE_FORMAT(bill_date, "%d/%m/%Y") AS bill_date,
                 DATE_FORMAT(due_date, "%d/%m/%Y") AS due_date,
+                IF (total_calls IS NULL, 0, total_calls) AS total_calls,
                 FORMAT(nominal, 0) AS nominal,
                 DATE_FORMAT(call_dial, "%d/%m/%Y %H:%i:%s") AS call_dial,
                 CONCAT(UCASE(LEFT(call_response, 1)), SUBSTRING(call_response, 2)) AS call_response
@@ -73,7 +76,7 @@ class ContactController extends Controller
     }
 
     public function contactListAjax(Request $request) {
-        $ORDERED_COLUMNS = ['account_id', 'name', 'phone', 'bill_date', 'due_date', 'nominal', 'call_dial', 'call_response'];
+        $ORDERED_COLUMNS = ['account_id', 'name', 'phone', 'bill_date', 'due_date', 'total_calls', 'nominal', 'call_dial', 'call_response'];
         $ORDERED_BY = ['desc', 'asc'];
         $COLUMN_IDX = is_numeric($request->order[0]['column']) ? $request->order[0]['column'] : 0;
         $START = is_numeric($request->start) ? $request->start : 0;
@@ -94,6 +97,7 @@ class ContactController extends Controller
                     phone,
                     DATE_FORMAT(bill_date, "%d/%m/%Y") AS bill_date,
                     DATE_FORMAT(due_date, "%d/%m/%Y") AS due_date,
+                    IF (total_calls IS NULL, 0, total_calls) AS total_calls,
                     FORMAT(nominal, 0) AS nominal
                 '))
                 ->offset($START)
