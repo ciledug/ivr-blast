@@ -129,10 +129,10 @@
           show: false
         },
         data: [
-          { value: {{ $answered }}, name: 'Answered' },
-          { value: {{ $noanswer }}, name: 'No Answer' },
-          { value: {{ $busy }}, name: 'Busy' },
-          { value: {{ $failed }}, name: 'Failed' },
+          { value: @php if ($answered > 0) echo $answered; else echo 'null'; @endphp, name: 'Answered' },
+          { value: @php if ($noanswer > 0) echo $noanswer; else echo 'null'; @endphp, name: 'No Answer' },
+          { value: @php if ($busy > 0) echo $busy; else echo 'null'; @endphp, name: 'Busy' },
+          { value: @php if ($failed > 0) echo $failed; else echo 'null'; @endphp, name: 'Failed' },
         ]
       }]
     });

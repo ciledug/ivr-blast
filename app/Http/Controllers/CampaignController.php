@@ -93,7 +93,7 @@ class CampaignController extends Controller
                 $campaignCreate = Campaign::create(array(
                     'unique_key' => $todayDateTime->getTimestamp(),
                     'name' => $request->name,
-                    'created_by' => Auth::user()->username,
+                    'created_by' => Auth::user()->id,
                 ));
 
                 list($newContacts, $existingContacts) = $this->saveValidContacts($campaignCreate->id, $dataRows);
@@ -136,42 +136,54 @@ class CampaignController extends Controller
         }
 
         $campaign = Campaign::where('unique_key', '=', Str::replaceFirst('_', '', $request->campaign))
-            ->where('total_calls', '=', '0')
             ->where(function($q) {
-                $q->where('status', '=', 'ready')
-                    ->orWhere('status', '=', 'paused');
+                $q->where('status', '=', 0)
+                    ->orWhere('status', '=', 2);
             })
             ->first();
 
         if ($campaign) {
-            $existingContacts = [];
-            $dataRows = json_decode($request->rows); // dd($dataRows);
-            $newContacts = [];
-            $existingContacts = [];
+            $countCallLogs = CallLog::where('contacts.campaign_id', '=', $campaign->id)
+                ->leftJoin('contacts', 'call_logs.contact_id', '=', 'contacts.id')
+                ->count('call_logs.contact_id');
 
-            if ($request->action && (count($dataRows) > 0)) {
-                if ($request->action === 'replace') {
-                    Contact::where('campaign_id', '=', $campaign->id)
-                        ->delete();
-                    $campaign->total_data = 0;
+            if ($countCallLogs == 0) {
+                $existingContacts = [];
+                $dataRows = json_decode($request->rows); // dd($dataRows);
+                $newContacts = [];
+                $existingContacts = [];
+    
+                if ($request->action && (count($dataRows) > 0)) {
+                    if ($request->action === 'replace') {
+                        Contact::where('campaign_id', '=', $campaign->id)
+                            ->delete();
+                        $campaign->total_data = 0;
+                    }
+    
+                    list($newContacts, $existingContacts) = $this->saveValidContacts($campaign->id, $dataRows);
+                    $campaign->total_data += count($newContacts);
                 }
 
-                list($newContacts, $existingContacts) = $this->saveValidContacts($campaign->id, $dataRows);
-                $campaign->total_data += count($newContacts);
-            }
+                $campaign->name = $request->name;
+                $campaign->save();
 
-            $campaign->name = $request->name;
-            $campaign->save();
-
-            if (empty($existingContacts)) {
-                return redirect()->route('campaign');
+                if (empty($existingContacts)) {
+                    return redirect()->route('campaign');
+                }
+                else {
+                    return back()->with([
+                        'name' => $campaign->name,
+                        'key' => $campaign->unique_key,
+                        'saved_contacts' => json_encode($newContacts),
+                        'failed_contacts' => json_encode($existingContacts)
+                    ]);
+                }
             }
             else {
                 return back()->with([
                     'name' => $campaign->name,
                     'key' => $campaign->unique_key,
-                    'saved_contacts' => json_encode($newContacts),
-                    'failed_contacts' => json_encode($existingContacts)
+                    'already_running' => 'This campaign already run',
                 ]);
             }
         }
@@ -202,10 +214,9 @@ class CampaignController extends Controller
 
         $query = Campaign::select(DB::raw('
                 campaigns.id AS campaign_id, campaigns.unique_key, campaigns.name, campaigns.total_data, campaigns.total_calls, campaigns.created_by,
-                IF (campaigns.status = 0, "Ready", IF (campaigns.status = 1, "Running", IF (campaigns.status = 2, "Finished", "Paused"))) AS status,
+                IF (campaigns.status = 0, "Ready", IF (campaigns.status = 1, "Running", IF (campaigns.status = 2, "Paused", "Finished"))) AS status,
                 DATE_FORMAT(campaigns.created_at, "%d/%m/%Y - %H:%i") AS created,
-                (SELECT COUNT(contacts.call_dial) FROM contacts WHERE contacts.campaign_id = campaigns.id AND contacts.call_dial IS NOT NULL) AS call_dial,
-                (SELECT COUNT(contacts.call_connect) FROM contacts WHERE contacts.campaign_id = campaigns.id AND contacts.call_connect IS NOT NULL) AS call_connect
+                (SELECT COUNT(contacts.call_dial) FROM contacts WHERE contacts.campaign_id = campaigns.id AND contacts.call_dial IS NOT NULL) AS call_dial
             '))
             ->whereNull('campaigns.deleted_at')
             ->orderBy('campaigns.created_at', 'desc');
@@ -288,7 +299,7 @@ class CampaignController extends Controller
 
         $validator = Validator::make($request->input(), [
             'campaign' => 'required|numeric',
-            'currstatus' => 'required|string|min:5|max:9',
+            'currstatus' => 'required|string|min:5|max:10',
             'startstop' => 'required|boolean',
         ]);
 
@@ -304,9 +315,9 @@ class CampaignController extends Controller
                     $newStatus = $campaignData->status;
 
                     switch ($request->currstatus) {
-                        case 'ready': $newStatus = 'running'; break; // ready to running
-                        case 'running': $newStatus = 'paused'; break; // running to paused
-                        case 'paused': $newStatus = 'running'; break; // paused to running
+                        case 'ready': $newStatus = 1; break; // ready to running
+                        case 'running': $newStatus = 2; break; // running to paused
+                        case 'paused': $newStatus = 1; break; // paused to running
                         default: break;
                     }
 
@@ -330,76 +341,37 @@ class CampaignController extends Controller
     public function exportData(Request $request)
     {
         $data = array();
-
-        $campaign = Campaign::select(DB::raw("
-                campaigns.id,
-                campaigns.name AS name,
-                campaigns.unique_key AS unique_key,
-                campaigns.total_data AS total_data,
-                campaigns.created_at,
-                CONCAT(UCASE(LEFT(campaigns.status, 1)), SUBSTRING(campaigns.status, 2)) AS status,
-                (SELECT COUNT(contacts.call_dial) FROM contacts WHERE contacts.campaign_id = campaigns.id AND contacts.call_dial IS NOT NULL) AS call_dial
-            "))
-            ->where('unique_key', '=', Str::replaceFirst('_', '', $request->campaign))
-            ->first();
-        // dd($campaign);
+        $campaign = $this->getCampaignData($request, null);
+        $contacts = array();
 
         if ($campaign) {
-            $tempProgress = 0;
-            // if ($campaign->call_dial > 0) {
-            //     $tempProgress = ($campaign->call_dial / $campaign->total_data) * 100;
-            // }
-            $campaign->progress = $tempProgress;
-
-            $tempSuccessCalls = CallLog::select('call_logs.contact_id')
-                ->where('call_logs.call_response', '=', 'success')
-                ->where('contacts.campaign_id', '=', $campaign->id)
-                ->leftJoin('contacts', 'call_logs.contact_id', '=', 'contacts.id')
-                ->orderBy('call_logs.created_at', 'DESC')
-                ->count('call_logs.contact_id');
-            $campaign->success = $tempSuccessCalls;
-
-            $tempFailedCalls = CallLog::select('call_logs.contact_id')
-                ->where('call_logs.call_response', '=', 'failed')
-                ->where('contacts.campaign_id', '=', $campaign->id)
-                ->leftJoin('contacts', 'call_logs.contact_id', '=', 'contacts.id')
-                ->orderBy('call_logs.created_at', 'DESC')
-                ->count('call_logs.contact_id');
-            $campaign->failed = $tempFailedCalls;
-
-            $tempStartDate = Contact::select(DB::raw('
-                    IF (call_logs.call_dial IS NOT NULL, DATE_FORMAT(MIN(call_logs.call_dial), "%d/%m/%Y %H:%i"), \'-\') AS started
-                '))
-                ->where('contacts.campaign_id', '=', $campaign->id)
-                ->leftJoin('call_logs', 'contacts.id', '=', 'call_logs.contact_id')
-                ->first();
-            $campaign->started = $tempStartDate->started;
-
-            $tempFinishDate = Contact::select(DB::raw('
-                    IF (call_logs.call_disconnect IS NOT NULL, DATE_FORMAT(MAX(call_logs.call_disconnect), "%d/%m/%Y %H:%i"), \'-\') AS finished
-                '))
-                ->where('contacts.campaign_id', '=', $campaign->id)
-                ->leftJoin('call_logs', 'contacts.id', '=', 'call_logs.contact_id')
-                ->first();
-            $campaign->finished = $tempFinishDate->finished;
-            
             $contacts = Contact::select(DB::raw("
                     campaigns.name AS CAMPAIGN_NAME,
+                    contacts.id,
                     contacts.account_id AS ACCOUNT_ID,
                     contacts.name AS CONTACT_NAME,
                     contacts.phone AS CONTACT_PHONE,
                     contacts.bill_date AS BILL_DATE,
                     contacts.due_date AS DUE_DATE,
-                    contacts.nominal AS NOMINAL,
-                    contacts.call_dial AS CALL_DIAL,
-                    contacts.call_connect AS CALL_CONNECT,
-                    contacts.call_disconnect AS CALL_DISCONNECT,
-                    contacts.call_duration CALL_DURATION,
-                    CONCAT(UCASE(LEFT(contacts.call_response, 1)), SUBSTRING(contacts.call_response, 2)) AS CALL_RESPONSE
+                    contacts.nominal AS NOMINAL
                 "))
                 ->leftJoin('campaigns', 'contacts.campaign_id', '=', 'campaigns.id')
                 ->where('contacts.campaign_id', '=', $campaign->id)
                 ->get();
+
+            foreach ($contacts AS $keyContact => $valueContact) {
+                $contacts[$keyContact]['CALL_DATE'] = '-';
+                $contacts[$keyContact]['CALL_RESPONSE'] = '-';
+                $tempCallLog = CallLog::select('call_dial', 'call_response')
+                    ->where('contact_id', '=', $valueContact->id)
+                    ->orderBy('id', 'DESC')
+                    ->first();
+                if ($tempCallLog) {
+                    $contacts[$keyContact]['CALL_DATE'] = $tempCallLog->call_dial;
+                    $contacts[$keyContact]['CALL_RESPONSE'] = ucwords($tempCallLog->call_response);
+                }
+                unset($contacts[$keyContact]['id']);
+            }
 
             $data['campaign'] = $campaign;
             $data['contacts'] = $contacts;
@@ -442,12 +414,16 @@ class CampaignController extends Controller
         $campaignList = array();
 
         $query = Campaign::select(DB::raw('
-                campaigns.id AS campaign_id, campaigns.unique_key, campaigns.name, campaigns.total_data, campaigns.total_calls, campaigns.created_by,
-                CONCAT(UCASE(LEFT(campaigns.status, 1)), SUBSTRING(campaigns.status, 2)) AS status,
+                campaigns.id AS campaign_id,
+                campaigns.unique_key,
+                campaigns.name,
+                campaigns.total_data,
+                campaigns.status AS status,
+                users.name AS created_by,
                 DATE_FORMAT(campaigns.created_at, "%d/%m/%Y - %H:%i") AS created,
-                (SELECT COUNT(contacts.call_dial) FROM contacts WHERE contacts.campaign_id = campaigns.id AND contacts.call_dial IS NOT NULL) AS call_dial,
-                (SELECT COUNT(contacts.call_connect) FROM contacts WHERE contacts.campaign_id = campaigns.id AND contacts.call_connect IS NOT NULL) AS call_connect
+                (SELECT COUNT(contacts.call_dial) FROM contacts WHERE contacts.campaign_id = campaigns.id AND contacts.call_dial IS NOT NULL) AS call_dial
             '))
+            ->leftJoin('users', 'campaigns.created_by', '=', 'users.id')
             ->offset($START)
             ->limit($LENGTH);
 
@@ -486,7 +462,7 @@ class CampaignController extends Controller
                         ->where('contacts.campaign_id', '=', $valueCampaignData->campaign_id)
                         ->where('call_logs.call_response', '=', 'failed')
                         ->leftJoin('contacts', 'call_logs.contact_id', '=', 'contacts.id')
-                        ->orderBy('call_logs.created_at', 'DESC')
+                        ->orderBy('call_logs.id', 'DESC')
                         ->count('call_logs.contact_id');
 
                     $tempStartDate = Contact::select(DB::raw('
@@ -502,6 +478,14 @@ class CampaignController extends Controller
                         ->where('contacts.campaign_id', '=', $valueCampaignData->campaign_id)
                         ->leftJoin('call_logs', 'contacts.id', '=', 'call_logs.contact_id')
                         ->first();
+
+                    switch ($valueCampaignData->status) {
+                        case 0: $valueCampaignData->status = 'Ready'; break;
+                        case 1: $valueCampaignData->status = 'Running'; break;
+                        case 2: $valueCampaignData->status = 'Paused'; break;
+                        case 3: $valueCampaignData->status = 'Finished'; break;
+                        default: break;
+                    }
 
                     $campaignList[] = array(
                         'seq' => $seq,
@@ -587,54 +571,64 @@ class CampaignController extends Controller
                 campaigns.name AS name,
                 campaigns.unique_key AS unique_key,
                 campaigns.total_data AS total_data,
-                campaigns.total_calls AS total_calls,
                 campaigns.created_at,
-                CONCAT(UCASE(LEFT(campaigns.status, 1)), SUBSTRING(campaigns.status, 2)) AS status,
-                (SELECT COUNT(contacts.call_dial) FROM contacts WHERE contacts.campaign_id = campaigns.id AND contacts.call_dial IS NOT NULL) AS call_dial,
-                (SELECT COUNT(contacts.call_connect) FROM contacts WHERE contacts.campaign_id = campaigns.id AND contacts.call_connect IS NOT NULL) AS call_connect,
-                (SELECT COUNT(contacts.call_duration) FROM contacts WHERE contacts.campaign_id = campaigns.id AND contacts.call_duration IS NOT NULL) AS call_duration
+                campaigns.status
             "))
             ->where('unique_key', '=', Str::replaceFirst('_', '', $request->campaign))
             ->first();
 
         if ($campaignData) {
-            $tempProgress = 0;
-            if ($campaignData->call_connect > 0) {
-                $tempProgress = ($campaignData->call_connect / $campaignData->total_data) * 100;
+            $campaignData->total_calls = 0;
+            $tempContactIds = Contact::select('id')
+                ->where('campaign_id', '=', $campaignData->id)
+                ->get();
+            foreach ($tempContactIds AS $keyContactIds => $valueContactIds) {
+                $tempCount = CallLog::select('id')
+                    ->where('contact_id', '=', $valueContactIds->id)
+                    ->count('id');
+                $campaignData->total_calls += $tempCount;
             }
-            $campaignData->progress = $tempProgress;
 
-            $tempSuccessCalls = CallLog::select('call_logs.contact_id')
-                ->where('call_logs.call_response', '=', 'success')
+            $campaignData->started = CallLog::leftJoin('contacts', 'call_logs.contact_id', '=', 'contacts.id')
+                ->where('contacts.campaign_id', '=', $campaignData->id)
+                ->min('call_logs.call_dial');
+
+            $campaignData->finished = CallLog::leftJoin('contacts', 'call_logs.contact_id', '=', 'contacts.id')
+                ->where('contacts.campaign_id', '=', $campaignData->id)
+                ->max('call_logs.call_disconnect');
+
+            $campaignData->success = CallLog::select('call_logs.contact_id')
+                ->where('call_logs.call_response', '=', 'answered')
                 ->where('contacts.campaign_id', '=', $campaignData->id)
                 ->leftJoin('contacts', 'call_logs.contact_id', '=', 'contacts.id')
-                ->orderBy('call_logs.created_at', 'DESC')
+                ->orderBy('call_logs.id', 'DESC')
                 ->count('call_logs.contact_id');
-            $campaignData->success = $tempSuccessCalls;
 
-            $tempFailedCalls = CallLog::select('call_logs.contact_id')
+            $campaignData->failed = CallLog::select('call_logs.contact_id')
                 ->where('contacts.campaign_id', '=', $campaignData->id)
                 ->where('call_logs.call_response', '=', 'failed')
                 ->leftJoin('contacts', 'call_logs.contact_id', '=', 'contacts.id')
-                ->orderBy('call_logs.created_at', 'DESC')
+                ->orderBy('call_logs.id', 'DESC')
                 ->count('call_logs.contact_id');
-            $campaignData->failed = $tempFailedCalls;
 
-            $tempStartDate = Contact::select(DB::raw('
-                    IF (call_logs.call_dial IS NOT NULL, DATE_FORMAT(MIN(call_logs.call_dial), "%d/%m/%Y %H:%i"), \'-\') AS started
-                '))
+            $calledContacts = CallLog::select('call_logs.id')
                 ->where('contacts.campaign_id', '=', $campaignData->id)
-                ->leftJoin('call_logs', 'contacts.id', '=', 'call_logs.contact_id')
-                ->first();
-            $campaignData->started = $tempStartDate->started;
+                ->leftJoin('contacts', 'contacts.id', '=', 'call_logs.contact_id')
+                // ->orderBy('call_logs.id', 'desc')
+                ->groupBy('call_logs.contact_id')
+                ->get();
+                
+            $campaignData->progress = number_format(($calledContacts->count() / $campaignData->total_data) * 100, 2, ',', '.');
+            if ($campaignData->progress < 100) {
+                $campaignData->finished = '-';
+            }
 
-            $tempFinishDate = Contact::select(DB::raw('
-                    IF (call_logs.call_disconnect IS NOT NULL, DATE_FORMAT(MAX(call_logs.call_disconnect), "%d/%m/%Y %H:%i"), \'-\') AS finished
-                '))
-                ->where('contacts.campaign_id', '=', $campaignData->id)
-                ->leftJoin('call_logs', 'contacts.id', '=', 'call_logs.contact_id')
-                ->first();
-            $campaignData->finished = $tempFinishDate->finished;
+            switch ($campaignData->status) {
+                case 0: $campaignData->status = 'Ready'; break;
+                case 1: $campaignData->status = 'Running'; break;
+                case 2: $campaignData->status = 'Paused'; break;
+                case 3: $campaignData->status = 'Finished'; break;
+            }
         }
 
         // dd($campaignData);
@@ -681,7 +675,8 @@ class CampaignController extends Controller
                                 ->exists();
 
                             if (!$isPhoneExists) {
-                                Contact::create($tempContact);
+                                unset($tempContact['failed']);
+                                Contact::insert($tempContact);
                                 $newContacts[] = $tempContact;
                             }
                             else {

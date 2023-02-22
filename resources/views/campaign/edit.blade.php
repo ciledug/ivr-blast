@@ -27,6 +27,14 @@
                   Edit Campaign
               </h5>
 
+              @if(session('already_running'))
+              <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <h4 class="alert-heading">Campaign Already Running</h4>
+                <p>This campaign already running once so can not be edited or changed</p>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+              </div>
+              @endif
+
               <div class="col-md-12">
                 <div class="form-floating">
                   <input type="text" class="form-control" id="edit-campaign-name" name="name" minlength="4" maxlength="50" placeholder="Name" value="{{ $campaign->name or '' }}" required>

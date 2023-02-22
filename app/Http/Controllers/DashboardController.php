@@ -34,14 +34,14 @@ class DashboardController extends Controller
             foreach($contactsData AS $keyContact => $valueContact) {
                 $callLogData = CallLog::select('call_response')
                     ->where('contact_id', '=', $valueContact->id)
-                    ->orderBy('created_at', 'desc')
+                    ->orderBy('id', 'desc')
                     ->first();
 
                 if ($callLogData) {
-                    if ($callLogData->call_response == 0) $answered++;
-                    else if ($callLogData->call_response == 1) $noAnswer++;
-                    else if ($callLogData->call_response == 2) $busy++;
-                    else if ($callLogData->call_response == 3) $failed++;
+                    if ($callLogData->call_response == 'answered') $answered++;
+                    else if ($callLogData->call_response == 'no_answer') $noAnswer++;
+                    else if ($callLogData->call_response == 'busy') $busy++;
+                    else if ($callLogData->call_response == 'failed') $failed++;
                 }
             }
 
@@ -50,7 +50,7 @@ class DashboardController extends Controller
 
             $campaignList[] = array(
                 'name' => $valueCampaign->name,
-                'progress' => number_format($totalProgress, 0, ',', '.'),
+                'progress' => number_format($totalProgress, 2, ',', '.'),
             );
 
             $totalAnswered += $answered;

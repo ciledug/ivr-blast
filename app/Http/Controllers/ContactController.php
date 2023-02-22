@@ -7,6 +7,7 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use App\Campaign;
 use App\Contact;
+use App\CallLog;
 use Carbon\Carbon;
 
 class ContactController extends Controller
@@ -28,18 +29,17 @@ class ContactController extends Controller
 
         $contact = Contact::select([
                 'contacts.id', 'contacts.account_id', 'contacts.name', 'contacts.phone', 'contacts.bill_date', 'contacts.due_date', 'contacts.nominal',
-                'call_logs.call_dial', 'call_logs.call_connect', 'call_logs.call_connect', 'call_logs.call_disconnect',
-                'call_logs.call_duration', 'call_logs.call_response'
+                'call_logs.call_dial', 'call_logs.call_connect', 'call_logs.call_disconnect', 'call_logs.call_duration', 'call_logs.call_response'
             ])
             ->leftJoin('call_logs', 'call_logs.contact_id', '=', 'contacts.id')
             ->where('contacts.campaign_id', '=', $campaign)
             ->where('contacts.account_id', '=', Str::replaceFirst('_', '', $contact))
-            ->orderBy('call_logs.created_at', 'DESC')
+            ->orderBy('call_logs.id', 'DESC')
             ->first();
 
         if ($contact) {
             $contact->nominal = number_format($contact->nominal, 0, ',', '.');
-            $contact->call_response = ucwords($contact->call_response);
+            $contact->call_response = $contact->call_response ? ucwords($contact->call_response) : '-';
             $data['contact'] = $contact;
         }
         
@@ -57,16 +57,7 @@ class ContactController extends Controller
                 DATE_FORMAT(due_date, "%d/%m/%Y") AS due_date,
                 FORMAT(nominal, 0) AS nominal,
                 DATE_FORMAT(call_dial, "%d/%m/%Y %H:%i:%s") AS call_dial,
-                DATE_FORMAT(call_connect, "%d/%m/%Y %H:%i:%s") AS call_connect,
-                DATE_FORMAT(call_disconnect, "%d/%m/%Y %H:%i:%s") AS call_disconnect,
-                DATE_FORMAT(call_duration, "%d/%m/%Y %H:%i:%s") AS call_duration,
-                IF(call_response=0, "Answered",
-                  IF(call_response=1, "No Answer",
-                    IF(call_response=2, "Busy",
-                      IF(call_response=3, "Failed", NULL)
-                    )
-                  )
-                ) AS call_response
+                CONCAT(UCASE(LEFT(call_response, 1)), SUBSTRING(call_response, 2)) AS call_response
             '))
             ->leftJoin('campaigns', 'campaign_id', '=', 'campaigns.id')
             ->where('campaigns.unique_key', $campaign);
@@ -97,15 +88,13 @@ class ContactController extends Controller
 
         if ($campaign) {
             $query = Contact::select(DB::raw('
-                    account_id, contacts.name AS name, phone,
+                    id,
+                    account_id,
+                    contacts.name AS name,
+                    phone,
                     DATE_FORMAT(bill_date, "%d/%m/%Y") AS bill_date,
                     DATE_FORMAT(due_date, "%d/%m/%Y") AS due_date,
-                    FORMAT(nominal, 0) AS nominal,
-                    DATE_FORMAT(call_dial, "%d/%m/%Y %H:%i:%s") AS call_dial,
-                    DATE_FORMAT(call_connect, "%d/%m/%Y %H:%i:%s") AS call_connect,
-                    DATE_FORMAT(call_disconnect, "%d/%m/%Y %H:%i:%s") AS call_disconnect,
-                    DATE_FORMAT(call_duration, "%d/%m/%Y %H:%i:%s") AS call_duration,
-                    CONCAT(UCASE(LEFT(call_response, 1)), SUBSTRING(call_response, 2)) AS call_response
+                    FORMAT(nominal, 0) AS nominal
                 '))
                 ->offset($START)
                 ->limit($LENGTH)
@@ -119,10 +108,7 @@ class ContactController extends Controller
                         ->orwhere('bill_date', 'LIKE', '%' . $SEARCH_VALUE . '%')
                         ->orwhere('due_date', 'LIKE', '%' . $SEARCH_VALUE . '%')
                         ->orwhere('nominal', 'LIKE', '%' . $SEARCH_VALUE . '%')
-                        ->orwhere('call_dial', 'LIKE', '%' . $SEARCH_VALUE . '%')
-                        ->orwhere('call_connect', 'LIKE', '%' . $SEARCH_VALUE . '%')
-                        ->orwhere('call_disconnect', 'LIKE', '%' . $SEARCH_VALUE . '%')
-                        ->orwhere('call_duration', 'LIKE', '%' . $SEARCH_VALUE . '%');
+                        ->orwhere('call_dial', 'LIKE', '%' . $SEARCH_VALUE . '%');
                 });
             }
 
@@ -130,8 +116,21 @@ class ContactController extends Controller
                 $query->orderBy($ORDERED_COLUMNS[$COLUMN_IDX], $request->order[0]['dir']);
             }
             
-            $contactList = $query->get();
             $recordsTotalQuery = Contact::where('contacts.campaign_id', '=', $campaign->id)->count();
+            $contactList = $query->get();
+
+            foreach ($contactList AS $keyContact => $valueContact) {
+                $contactList[$keyContact]->call_dial = '-';
+                $contactList[$keyContact]->call_response = '-';
+                $tempCallLog = CallLog::select('call_dial', 'call_response')
+                    ->where('contact_id', '=', $valueContact->id)
+                    ->orderBy('id', 'DESC')
+                    ->first();
+                if ($tempCallLog) {
+                    $contactList[$keyContact]->call_dial = $tempCallLog->call_dial;
+                    $contactList[$keyContact]->call_response = ucwords($tempCallLog->call_response);
+                }
+            }
         }
 
         $returnedResponse = array(

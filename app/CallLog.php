@@ -3,11 +3,9 @@
 namespace App;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 
 class CallLog extends Model
 {
-    use SoftDeletes;
     
     protected $fillable = [
         'contact_id',
@@ -17,6 +15,4 @@ class CallLog extends Model
         'call_duration',
         'call_response'
     ];
-
-    protected $dates = ['deleted_at'];
 }

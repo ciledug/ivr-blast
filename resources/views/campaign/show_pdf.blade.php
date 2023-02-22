@@ -51,23 +51,23 @@
           <table class="table table-hover" style="width:100%;">
             <tr>
               <td style="width:50%; line-height:0.85em;"><span style="font-weight:bold">Name</span><br>{{ $campaign->name or '' }}</td>
-              <td style="width:50%; line-height:0.85em;"><span style="font-weight:bold">Date Started</span><br>{{ $campaign->started or '' }}</td>
+              <td style="width:50%; line-height:0.85em;"><span style="font-weight:bold">Date Started</span><br>{{ $campaign->started or '-' }}</td>
             </tr>
             <tr>
-              <td style="width:50%; padding-top:0.85em; line-height:0.85em;"><span style="font-weight:bold">Total Data</span><br>{{ number_format($campaign->total_data, 0, ',', '.') or '' }}</td>
-              <td style="width:50%; padding-top:0.85em; line-height:0.85em;"><span style="font-weight:bold">Date Finished</span><br>{{ $campaign->finished or '' }}</td>
+              <td style="width:50%; padding-top:0.85em; line-height:0.85em;"><span style="font-weight:bold">Total Data</span><br>{{ $campaign->total_data or '0' }}</td>
+              <td style="width:50%; padding-top:0.85em; line-height:0.85em;"><span style="font-weight:bold">Date Finished</span><br>{{ $campaign->finished or '-' }}</td>
             </tr>
             <tr>
-              <td style="width:50%; padding-top:0.85em; line-height:0.85em;"><span style="font-weight:bold">Status</span><br>{{ $campaign->status or '' }}</td>
-              <td style="width:50%; padding-top:0.85em; line-height:0.85em;"><span style="font-weight:bold">Total Calls</span><br>{{ $campaign->call_dial or '' }}</td>
+              <td style="width:50%; padding-top:0.85em; line-height:0.85em;"><span style="font-weight:bold">Status</span><br>{{ $campaign->status or '-' }}</td>
+              <td style="width:50%; padding-top:0.85em; line-height:0.85em;"><span style="font-weight:bold">Total Calls</span><br>{{ $campaign->total_calls or '0' }}</td>
             </tr>
             <tr>
-              <td style="width:50%; padding-top:0.85em; line-height:0.85em;"><span style="font-weight:bold">Created Date</span><br>{{ $campaign->created_at or '' }}</td>
-              <td style="width:50%; padding-top:0.85em; line-height:0.85em;"><span style="font-weight:bold">Success Calls</span><br>{{ $campaign->success or '' }}</td>
+              <td style="width:50%; padding-top:0.85em; line-height:0.85em;"><span style="font-weight:bold">Created Date</span><br>{{ $campaign->created_at or '-' }}</td>
+              <td style="width:50%; padding-top:0.85em; line-height:0.85em;"><span style="font-weight:bold">Success Calls</span><br>{{ $campaign->success or '0' }}</td>
             </tr>
             <tr>
-              <td style="width:50%; padding-top:0.85em; line-height:0.85em;"><span style="font-weight:bold">Campaign Progress (%)</span><br>{{ $campaign->progress }}</td>
-              <td style="width:50%; padding-top:0.85em; line-height:0.85em;"><span style="font-weight:bold">Failed Calls</span><br>{{ $campaign->failed }}</td>
+              <td style="width:50%; padding-top:0.85em; line-height:0.85em;"><span style="font-weight:bold">Campaign Progress (%)</span><br>{{ $campaign->progress or '0' }}</td>
+              <td style="width:50%; padding-top:0.85em; line-height:0.85em;"><span style="font-weight:bold">Failed Calls</span><br>{{ $campaign->failed or '0' }}</td>
             </tr>
           </table>
         </div>

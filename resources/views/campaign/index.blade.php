@@ -55,7 +55,6 @@ var campaignList = [];
 
   $(document).ready(function() {
     prepareCampaignListTable();
-    // getCampaignList();
   });
 
   function startStopCampaign(campaignKey, currentStatus) {

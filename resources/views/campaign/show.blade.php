@@ -63,7 +63,7 @@
                 <div class="row">
                   <div class="col-md-12 mt-2">
                     <div class="row">
-                      <div class="col-lg-3 col-md-4 label">Created Date</div>
+                      <div class="col-lg-4 col-md-5 label">Created Date</div>
                     </div>
                     <div class="row">
                       <div id="dialog-detail-campaign-created-date" class="col-lg-9 col-md-8 h5">{{ $campaign->created_at }}</div>
@@ -71,6 +71,7 @@
                   </div>
                 </div>
 
+                @if (strtolower($campaign->status) !== 'finished')
                 <div class="row">
                   <div class="col-md-12 mt-4">
                       @if (strtolower($campaign->status) === 'ready')
@@ -82,6 +83,7 @@
                       @endif
                   </div>
                 </div>
+                @endif
               </div>
 
               <div class="col-md-6">
@@ -91,7 +93,7 @@
                       <div class="col-lg-4 col-md-4 label">Date Started</div>
                     </div>
                     <div class="row">
-                      <div id="dialog-detail-campaign-date-started" class="col-lg-8 col-md-8 h5">{{ $campaign->started }}</div>
+                      <div id="dialog-detail-campaign-date-started" class="col-lg-8 col-md-8 h5">{{ $campaign->started or '-' }}</div>
                     </div>
                   </div>
                 </div>
@@ -102,7 +104,7 @@
                       <div class="col-lg-4 col-md-4 label">Date Finished</div>
                     </div>
                     <div class="row">
-                      <div id="dialog-detail-campaign-date-finished" class="col-lg-8 col-md-8 h5">{{ $campaign->finished }}</div>
+                      <div id="dialog-detail-campaign-date-finished" class="col-lg-8 col-md-8 h5">{{ $campaign->finished or '-' }}</div>
                     </div>
                   </div>
                 </div>
@@ -113,7 +115,7 @@
                       <div class="col-lg-4 col-md-4 label">Total Calls</div>
                     </div>
                     <div class="row">
-                      <div id="dialog-detail-campaign-total-calls" class="col-lg-8 col-md-8 h5">{{ $campaign->total_calls }}</div>
+                      <div id="dialog-detail-campaign-total-calls" class="col-lg-8 col-md-8 h5">{{ $campaign->total_calls or '0' }}</div>
                     </div>
                   </div>
                 </div>
@@ -124,7 +126,7 @@
                       <div class="col-lg-4 col-md-4 label">Success Calls</div>
                     </div>
                     <div class="row">
-                      <div id="dialog-detail-campaign-success-calls" class="col-lg-8 col-md-8 h5">{{ $campaign->success }}</div>
+                      <div id="dialog-detail-campaign-success-calls" class="col-lg-8 col-md-8 h5">{{ $campaign->success or '0' }}</div>
                     </div>
                   </div>
                 </div>
@@ -135,7 +137,7 @@
                       <div class="col-lg-4 col-md-4 label">Failed Calls</div>
                     </div>
                     <div class="row">
-                      <div id="dialog-detail-campaign-failed-calls" class="col-lg-8 col-md-8 h5">{{ $campaign->failed }}</div>
+                      <div id="dialog-detail-campaign-failed-calls" class="col-lg-8 col-md-8 h5">{{ $campaign->failed or '0' }}</div>
                     </div>
                   </div>
                 </div>
@@ -146,7 +148,7 @@
                       <div class="col-lg-5 col-md-4 label">Campaign Progress (%)</div>
                     </div>
                     <div class="row">
-                      <div id="dialog-detail-campaign-progress" class="col-lg-7 col-md-8 h5">{{ $campaign->progress }}</div>
+                      <div id="dialog-detail-campaign-progress" class="col-lg-7 col-md-8 h5">{{ $campaign->progress or '0' }}</div>
                     </div>
                   </div>
                 </div>
