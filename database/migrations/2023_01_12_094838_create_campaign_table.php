@@ -20,11 +20,11 @@ class CreateCampaignTable extends Migration
             $table->increments('id');
             $table->string('unique_key', 20)->unique();
             $table->string('name', 50);
-            $table->string('excel_name', 100)->default(null)->nullable();
+            //$table->string('excel_name', 100)->default(null)->nullable();
             $table->integer('total_data')->unsigned()->default(0)->nullable();
-            $table->smallInteger('total_calls')->unsigned()->default(0)->nullable();
-            $table->string('status', 10)->default('ready')->nullable()->comment('ready, running, finished, paused');
-            $table->string('created_by', 100)->default(null)->nullable();
+            //$table->smallInteger('total_calls')->unsigned()->default(0)->nullable();
+            $table->integer('status')->default(0)->comment('0=ready, 1=running, 2=paused, 3=finished');
+            $table->integer('created_by');
             $table->timestamps();
             $table->softDeletes();
         });

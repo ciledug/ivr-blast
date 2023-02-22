@@ -20,18 +20,15 @@ class CreateContactsTable extends Migration
             $table->increments('id');
             $table->integer('campaign_id')->unsigned();
             $table->string('account_id', 50);
-            $table->string('name', 50);
+            $table->string('name', 50)->nullable();
             $table->string('phone', 15);
-            $table->date('bill_date')->default(null)->nullable();
-            $table->date('due_date')->default(null)->nullable();
+            $table->date('bill_date')->nullable();
+            $table->date('due_date')->nullable();
             $table->integer('nominal')->unsigned();
-            $table->datetime('call_dial')->default(null)->nullable();
-            $table->datetime('call_connect')->default(null)->nullable();
-            $table->datetime('call_disconnect')->default(null)->nullable();
-            $table->datetime('call_duration')->default(null)->nullable();
-            $table->string('call_response', 10)->default(null)->nullable()->comment('answered, no_answer, busy, failed');
-            $table->timestamps();
-            $table->softDeletes();
+			$table->integer('extension')->nullable();
+			$table->string('callerid')->nullable();
+            $table->datetime('call_dial')->nullable();
+            $table->string('call_response', 15)->index()->nullable()->comment('answered, no_answer, busy, failed');
         });
     }
 

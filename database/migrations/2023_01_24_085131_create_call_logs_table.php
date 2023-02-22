@@ -19,13 +19,11 @@ class CreateCallLogsTable extends Migration
             
             $table->increments('id');
             $table->integer('contact_id')->unsigned();
-            $table->datetime('call_dial')->default(null)->nullable();
-            $table->datetime('call_connect')->default(null)->nullable();
-            $table->datetime('call_disconnect')->default(null)->nullable();
-            $table->datetime('call_duration')->default(null)->nullable();
-            $table->string('call_response', 10)->default(null)->nullable()->comment('answered, no_answer, busy, failed');
-            $table->timestamps();
-            $table->softDeletes();
+            $table->datetime('call_dial')->nullable();
+            $table->datetime('call_connect')->nullable();
+            $table->datetime('call_disconnect')->nullable();
+            $table->integer('call_duration')->default(0);
+            $table->string('call_response', 15)->nullable()->comment('answered, no_answer, busy, failed');
         });
     }
 
