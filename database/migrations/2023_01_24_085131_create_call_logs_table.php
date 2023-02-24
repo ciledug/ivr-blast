@@ -22,8 +22,9 @@ class CreateCallLogsTable extends Migration
             $table->datetime('call_dial')->nullable();
             $table->datetime('call_connect')->nullable();
             $table->datetime('call_disconnect')->nullable();
-            $table->integer('call_duration')->default(0);
+            $table->integer('call_duration')->nullable();
             $table->string('call_response', 15)->nullable()->comment('answered, no_answer, busy, failed');
+            $table->string('call_recording', 255)->nullable();
         });
     }
 

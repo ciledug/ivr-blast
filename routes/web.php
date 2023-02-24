@@ -67,8 +67,9 @@ Route::group(
             Route::post('list', 'ContactController@contactListAjax')->name('contact.list.ajax');
         });
         
-        Route::prefix('call')->group(function() {
-            Route::get('/{startDate?}/{endDate?}', 'CallLogController@getCallStatus')->name('call.status');
+        Route::prefix('calllog')->group(function() {
+            Route::get('/{campaign?}', 'CallLogController@index')->name('calllogs');
+            Route::get('/{startDate?}/{endDate?}', 'CallLogController@getCallStatus')->name('callog.status');
         });
     }
 );

@@ -5,9 +5,7 @@
 <!-- Vendor JS Files -->
 <script src="{{ url('vendor/apexcharts/apexcharts.min.js') }}"></script>
 <script src="{{ url('vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
-<!--
-<script src="{{ url('vendor/chart.js/chart.umd.js') }}"></script>
--->
+<!-- <script src="{{ url('vendor/chart.js/chart.umd.js') }}"></script> -->
 <script src="{{ url('vendor/echarts/echarts.min.js') }}"></script>
 <script src="{{ url('vendor/quill/quill.min.js') }}"></script>
 <!-- <script src="{{ url('vendor/simple-datatables/simple-datatables.js') }}"></script> -->

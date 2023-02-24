@@ -1,5 +1,6 @@
 <aside id="sidebar" class="sidebar">
     <ul class="sidebar-nav" id="sidebar-nav">
+        <!-- dashboard -->
         <li class="nav-item">
             @if (Route::currentRouteName() === 'dashboard')
             <a class="nav-link" href="{{ url('/dashboard') }}">
@@ -11,6 +12,7 @@
             </a>
         </li>
     
+        <!-- campaign -->
         <li class="nav-item">
             @if (Route::currentRouteName() === 'campaign')
             <a class="nav-link" href="{{ url('/campaign') }}">
@@ -21,7 +23,20 @@
                 <span>Campaign</span>
             </a>
         </li>
+
+        <!-- calllogs -->
+        <li class="nav-item">
+            @if (Route::currentRouteName() === 'calllogs')
+            <a class="nav-link" href="{{ route('calllogs') }}">
+            @else
+            <a class="nav-link collapsed" href="{{ route('calllogs') }}">
+            @endif
+                <i class="bi bi-person"></i>
+                <span>Call Logs</span>
+            </a>
+        </li>
     
+        <!-- user -->
         <li class="nav-item">
             @if (Route::currentRouteName() === 'user')
             <a class="nav-link" href="{{ url('/user') }}">
@@ -33,6 +48,7 @@
             </a>
         </li>
     
+        <!-- account -->
         <li class="nav-item">
             @if (Route::currentRouteName() === 'account')
             <a class="nav-link" href="{{ url('/account') }}">

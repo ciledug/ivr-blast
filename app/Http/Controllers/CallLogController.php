@@ -6,13 +6,45 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 use App\CallLog;
+use App\Campaign;
 use Carbon\Carbon;
+use Validator;
 
 class CallLogController extends Controller
 {
     public function __construct()
     {
         // $this->middleware('auth');
+    }
+
+    public function index($campaign=null)
+    {
+        $campaigns = Campaign::select('id', 'unique_key', 'name')->get();
+        $callLogs = array();
+
+        $validator = Validator::make(['campaign' => $campaign], [
+            'campaign' => 'nullable|numeric|min:1|max:' . $campaigns->count()
+        ]);
+        if ($validator->fails()) return back();
+
+        $callLogs = CallLog::select(
+            'contacts.id AS contact_id', 'contacts.name',
+                'call_logs.call_dial', 'call_logs.call_connect', 'call_logs.call_disconnect', 'call_logs.call_duration', 'call_logs.call_response', 'call_logs.call_recording'
+            )
+            ->leftJoin('contacts', 'call_logs.contact_id', '=', 'contacts.id')
+            ->orderBy('call_logs.id', 'DESC');
+
+        if ($campaign) {
+            $callLogs->where('contacts.campaign_id', '=', $campaign);
+        }
+
+        $callLogs = $callLogs->paginate(15);
+
+        return view('calllogs.index', array(
+            'campaigns' => $campaigns,
+            'selectedCampaign' => (int) $campaign,
+            'calllogs' => $callLogs,
+        ));
     }
 
     public function getCallStatus(Request $request, $sentStartDate=null, $sentEndDate=null) {

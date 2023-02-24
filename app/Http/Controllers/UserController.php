@@ -156,39 +156,6 @@ class UserController extends Controller
         }
     }
 
-    public function getUserList_old(Request $request)
-    {
-        $returnedResponse = array(
-            'code' => 500,
-            'message' => 'Server Error',
-            'count' => 0,
-            'data' => [],
-        );
-
-        $query = User::select(DB::raw('
-                users.name,
-                users.username,
-                users.email,
-                users.added_by,
-                user_logs.last_login AS last_login,
-                user_logs.last_ip_address AS last_ip_address
-            '))
-            ->leftJoin('user_logs', 'user_logs.user_id', '=', 'users.id')
-            ->whereNull('users.deleted_at')
-            ->groupBy('users.id')
-            ->orderBy('user_logs.created_at', 'DESC')
-            ->get();
-
-        if ($query) {
-            $returnedResponse['code'] = 200;
-            $returnedResponse['message'] = 'OK';
-            $returnedResponse['count'] = $query->count();
-            $returnedResponse['data'] = $query;
-        }
-
-        return response()->json($returnedResponse);
-    }
-
     public function getUserList(Request $request)
     {
         $returnedResponse = array(
@@ -247,9 +214,7 @@ class UserController extends Controller
         $recordsTotalQuery = 0;
         $userList = [];
 
-        $query = User::select(['name', 'username', 'email', 'added_by'])
-            ->offset($START)
-            ->limit($LENGTH);
+        $query = User::select(['name', 'username', 'email', 'added_by']);
 
         if (!empty($SEARCH_VALUE)) {
             $query->where(function($q) use($SEARCH_VALUE) {
@@ -265,7 +230,8 @@ class UserController extends Controller
             $query->orderBy($ORDERED_COLUMNS[$COLUMN_IDX], $request->order[0]['dir']);
         }
 
-        $users = $query->get();
+        $filteredData = $query->get();
+        $users = $query->offset($START)->limit($LENGTH)->get();
 
         if ($users) {
             if ($users->count() > 0) {
@@ -290,8 +256,8 @@ class UserController extends Controller
 
         $returnedResponse = array(
             'draw' => $request->draw,
-            'recordsTotal' => count($userList),
-            'recordsFiltered' => $recordsTotalQuery,
+            'recordsTotal' => User::all()->count(),
+            'recordsFiltered' => $filteredData->count(),
             'data' => $userList
         );
 

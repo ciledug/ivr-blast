@@ -79,8 +79,8 @@ class ContactController extends Controller
         $ORDERED_COLUMNS = ['account_id', 'name', 'phone', 'bill_date', 'due_date', 'total_calls', 'nominal', 'call_dial', 'call_response'];
         $ORDERED_BY = ['desc', 'asc'];
         $COLUMN_IDX = is_numeric($request->order[0]['column']) ? $request->order[0]['column'] : 0;
-        $START = is_numeric($request->start) ? $request->start : 0;
-        $LENGTH = is_numeric($request->length) ? $request->length : 10;
+        $START = is_numeric($request->start) ? (int) $request->start : 0;
+        $LENGTH = is_numeric($request->length) ? (int) $request->length : 10;
         $SEARCH_VALUE = !empty($request->search['value']) ? $request->search['value'] : '';
 
         $campaign = Str::replaceFirst('_', '', $request->campaign);
@@ -100,8 +100,6 @@ class ContactController extends Controller
                     IF (total_calls IS NULL, 0, total_calls) AS total_calls,
                     FORMAT(nominal, 0) AS nominal
                 '))
-                ->offset($START)
-                ->limit($LENGTH)
                 ->where('campaign_id', '=', $campaign->id);
 
             if (!empty($SEARCH_VALUE)) {
@@ -119,9 +117,8 @@ class ContactController extends Controller
             if (in_array($request->order[0]['dir'], $ORDERED_BY)) {
                 $query->orderBy($ORDERED_COLUMNS[$COLUMN_IDX], $request->order[0]['dir']);
             }
-            
-            $recordsTotalQuery = Contact::where('contacts.campaign_id', '=', $campaign->id)->count();
-            $contactList = $query->get();
+            $filteredData = $query->get();
+            $contactList = $query->offset($START)->limit($LENGTH)->get();
 
             foreach ($contactList AS $keyContact => $valueContact) {
                 $contactList[$keyContact]->call_dial = '-';
@@ -139,12 +136,82 @@ class ContactController extends Controller
 
         $returnedResponse = array(
             'draw' => $request->draw,
-            'recordsTotal' => $contactList->count(),
-            'recordsFiltered' => $recordsTotalQuery,
+            'recordsTotal' => Contact::where('contacts.campaign_id', '=', $campaign->id)->count(),
+            'recordsFiltered' => $filteredData->count(),
             'data' => $contactList
         );
 
         return response()->json($returnedResponse);
+    }
+
+    public function getContactListCommon(Request $request) {
+        $ORDERED_COLUMNS = ['account_id', 'name', 'phone', 'bill_date', 'due_date', 'total_calls', 'nominal', 'call_dial', 'call_response'];
+        $ORDERED_BY = ['desc', 'asc'];
+
+        $COLUMN_IDX = is_numeric($request->order[0]['column']) ? $request->order[0]['column'] : 0;
+        $START = is_numeric($request->start) ? (int) $request->start : 0;
+        $LENGTH = is_numeric($request->length) ? (int) $request->length : 10;
+        $SEARCH_VALUE = !empty($request->search['value']) ? $request->search['value'] : '';
+
+        $campaign = Campaign::where('unique_key', '=', Str::replaceFirst('_', '', $request->campaign))->first();
+
+        $recordsTotalQuery = 0;
+        $contactList = [];
+
+        if ($campaign) {
+            $query = Contact::select(DB::raw('
+                    id,
+                    account_id,
+                    contacts.name AS name,
+                    phone,
+                    DATE_FORMAT(bill_date, "%d/%m/%Y") AS bill_date,
+                    DATE_FORMAT(due_date, "%d/%m/%Y") AS due_date,
+                    IF (total_calls IS NULL, 0, total_calls) AS total_calls,
+                    FORMAT(nominal, 0) AS nominal
+                '))
+                ->where('campaign_id', '=', $campaign->id);
+
+            if (!empty($SEARCH_VALUE)) {
+                $query->where(function($q) use($SEARCH_VALUE) {
+                    $q->where('contacts.account_id', 'LIKE', '%' . $SEARCH_VALUE . '%')
+                        ->orWhere('contacts.name', 'LIKE', '%' . $SEARCH_VALUE . '%')
+                        ->orwhere('contacts.phone', 'LIKE', '%' . $SEARCH_VALUE . '%')
+                        ->orwhere('bill_date', 'LIKE', '%' . $SEARCH_VALUE . '%')
+                        ->orwhere('due_date', 'LIKE', '%' . $SEARCH_VALUE . '%')
+                        ->orwhere('nominal', 'LIKE', '%' . $SEARCH_VALUE . '%')
+                        ->orwhere('call_dial', 'LIKE', '%' . $SEARCH_VALUE . '%');
+                });
+            }
+
+            if (in_array($request->order[0]['dir'], $ORDERED_BY)) {
+                $query->orderBy($ORDERED_COLUMNS[$COLUMN_IDX], $request->order[0]['dir']);
+            }
+            $filteredData = $query->get();
+            // $contactList = $query->offset($START)->limit($LENGTH)->get();
+            $contactList = $query->paginate(15);
+
+            foreach ($contactList AS $keyContact => $valueContact) {
+                $contactList[$keyContact]->call_dial = '-';
+                $contactList[$keyContact]->call_response = '-';
+                $tempCallLog = CallLog::select('call_dial', 'call_response')
+                    ->where('contact_id', '=', $valueContact->id)
+                    ->orderBy('id', 'DESC')
+                    ->first();
+                if ($tempCallLog) {
+                    $contactList[$keyContact]->call_dial = $tempCallLog->call_dial;
+                    $contactList[$keyContact]->call_response = ucwords($tempCallLog->call_response);
+                }
+            }
+        }
+
+        $returnedResponse = array(
+            'draw' => $request->draw,
+            'recordsTotal' => Contact::where('contacts.campaign_id', '=', $campaign->id)->count(),
+            'recordsFiltered' => $filteredData->count(),
+            'data' => $contactList
+        );
+
+        return $returnedResponse;
     }
     
     public function getCallStatus(Request $request, $sentStartDate=null, $sentEndDate=null) {

@@ -38,6 +38,7 @@ class CampaignController extends Controller
         return view('campaign.create');
     }
 
+    /*
     public function show(Request $request, $campaign=null)
     {
         $data = array(
@@ -52,11 +53,36 @@ class CampaignController extends Controller
         $data = array();
 
         $campaignData = Campaign::where('unique_key', '=', Str::replaceFirst('_', '', $campaign))
-            ->whereNull('deleted_at')
             ->first();
 
         if ($campaignData) {
             $data['campaign'] = $campaignData;
+        }
+
+        return view('campaign.edit', $data);
+    }
+    */
+
+    public function show(Request $request, $campaign=null)
+    {
+        $data = array(
+            'campaign' => $this->getCampaignData($request, $campaign),
+        );
+        $data['contacts'] = $this->getContactListCommon($request, $campaign);
+        // dd($data);
+
+        return view('campaign.show', $data);
+    }
+
+    public function edit(Request $request, $campaign=null)
+    {
+        $data = array();
+        $campaignData = Campaign::where('unique_key', '=', Str::replaceFirst('_', '', $campaign))
+            ->first();
+
+        if ($campaignData) {
+            $data['campaign'] = $campaignData;
+            $data['contacts'] = $this->getContactListCommon($request, $campaign);
         }
 
         return view('campaign.edit', $data);
@@ -467,9 +493,7 @@ class CampaignController extends Controller
                 DATE_FORMAT(campaigns.created_at, "%d/%m/%Y - %H:%i") AS created,
                 (SELECT COUNT(contacts.call_dial) FROM contacts WHERE contacts.campaign_id = campaigns.id AND contacts.call_dial IS NOT NULL) AS call_dial
             '))
-            ->leftJoin('users', 'campaigns.created_by', '=', 'users.id')
-            ->offset($START)
-            ->limit($LENGTH);
+            ->leftJoin('users', 'campaigns.created_by', '=', 'users.id');
 
         if (!empty($SEARCH_VALUE)) {
             $query->where(function($q) use($SEARCH_VALUE) {
@@ -483,8 +507,9 @@ class CampaignController extends Controller
             $query->orderBy($ORDERED_COLUMNS[$COLUMN_IDX], $request->order[0]['dir']);
         }
 
-        DB::enableQueryLog();
-        $campaignData = $query->get();
+        // DB::enableQueryLog();
+        $filteredData = $query->get();
+        $campaignData = $query->offset($START)->limit($LENGTH)->get();
         // dd(DB::getQueryLog());
         // dd($campaignData);
 
@@ -556,7 +581,7 @@ class CampaignController extends Controller
         $returnedResponse = array(
             'draw' => $request->draw,
             'recordsTotal' => Campaign::all()->count(),
-            'recordsFiltered' => count($campaignList),
+            'recordsFiltered' => $filteredData->count(),
             'data' => $campaignList
         );
 
@@ -742,5 +767,76 @@ class CampaignController extends Controller
         }
 
         return array($newContacts, $existingContacts);
+    }
+
+    private function getContactListCommon($request, $campaign) {
+        $ORDERED_COLUMNS = ['account_id', 'name', 'phone', 'bill_date', 'due_date', 'total_calls', 'nominal', 'call_dial', 'call_response'];
+        $ORDERED_BY = ['desc', 'asc'];
+
+        $COLUMN_IDX = is_numeric($request->order[0]['column']) ? $request->order[0]['column'] : 0;
+        $START = is_numeric($request->start) ? (int) $request->start : 0;
+        $LENGTH = is_numeric($request->length) ? (int) $request->length : 10;
+        $SEARCH_VALUE = !empty($request->search['value']) ? $request->search['value'] : '';
+
+        $campaign = Campaign::where('unique_key', '=', Str::replaceFirst('_', '', $campaign))->first();
+        // dd($campaign);
+
+        $recordsTotalQuery = 0;
+        $contactList = [];
+
+        if ($campaign) {
+            $query = Contact::select(DB::raw('
+                    id,
+                    account_id,
+                    contacts.name AS name,
+                    phone,
+                    DATE_FORMAT(bill_date, "%d/%m/%Y") AS bill_date,
+                    DATE_FORMAT(due_date, "%d/%m/%Y") AS due_date,
+                    IF (total_calls IS NULL, 0, total_calls) AS total_calls,
+                    FORMAT(nominal, 0) AS nominal
+                '))
+                ->where('campaign_id', '=', $campaign->id);
+
+            if (!empty($SEARCH_VALUE)) {
+                $query->where(function($q) use($SEARCH_VALUE) {
+                    $q->where('contacts.account_id', 'LIKE', '%' . $SEARCH_VALUE . '%')
+                        ->orWhere('contacts.name', 'LIKE', '%' . $SEARCH_VALUE . '%')
+                        ->orwhere('contacts.phone', 'LIKE', '%' . $SEARCH_VALUE . '%')
+                        ->orwhere('bill_date', 'LIKE', '%' . $SEARCH_VALUE . '%')
+                        ->orwhere('due_date', 'LIKE', '%' . $SEARCH_VALUE . '%')
+                        ->orwhere('nominal', 'LIKE', '%' . $SEARCH_VALUE . '%')
+                        ->orwhere('call_dial', 'LIKE', '%' . $SEARCH_VALUE . '%');
+                });
+            }
+
+            if (in_array($request->order[0]['dir'], $ORDERED_BY)) {
+                $query->orderBy($ORDERED_COLUMNS[$COLUMN_IDX], $request->order[0]['dir']);
+            }
+            $filteredData = $query->get();
+            // $contactList = $query->offset($START)->limit($LENGTH)->get();
+            $contactList = $query->paginate(15);
+
+            foreach ($contactList AS $keyContact => $valueContact) {
+                $contactList[$keyContact]->call_dial = '-';
+                $contactList[$keyContact]->call_response = '-';
+                $tempCallLog = CallLog::select('call_dial', 'call_response')
+                    ->where('contact_id', '=', $valueContact->id)
+                    ->orderBy('id', 'DESC')
+                    ->first();
+                if ($tempCallLog) {
+                    $contactList[$keyContact]->call_dial = $tempCallLog->call_dial;
+                    $contactList[$keyContact]->call_response = ucwords($tempCallLog->call_response);
+                }
+            }
+        }
+
+        $returnedResponse = array(
+            'draw' => $request->draw,
+            'recordsTotal' => Contact::where('contacts.campaign_id', '=', $campaign->id)->count(),
+            'recordsFiltered' => $filteredData->count(),
+            'data' => $contactList
+        );
+
+        return $returnedResponse;
     }
 }

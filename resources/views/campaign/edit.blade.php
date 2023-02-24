@@ -70,6 +70,36 @@
 
               <hr>
 
+              <table class="table table-striped table-hover">
+                <thead>
+                  <tr>
+                      {{-- <th scope="col">#</th> --}}
+                      <th scope="col">Account ID</th>
+                      <th scope="col">Name</th>
+                      <th scope="col">Phone</th>
+                      <th scope="col">Bill Date</th>
+                      <th scope="col">Due Date</th>
+                      <th scope="col">Nominal</th>
+                  </tr>
+                </thead>
+  
+                <tbody>
+                  @foreach ($contacts['data'] AS $keyData => $valueData)
+                  <tr>
+                    <th>{{ $valueData->account_id }}</th>
+                    <td>{{ $valueData->name }}</td>
+                    <td>{{ $valueData->phone }}</td>
+                    <td>{{ $valueData->bill_date }}</td>
+                    <td>{{ $valueData->due_date }}</td>
+                    <td class="text-end">{{ $valueData->nominal }}</td>
+                  </tr>
+                  @endforeach
+                </tbody>
+              </table>
+
+              {{ $contacts['data']->links() }}
+
+              <!--
               <div class="col-md-12 mt-4">
                 <table id="table-preview-contact-data-container" class="table table-hover">
                   <thead>
@@ -85,6 +115,7 @@
                   </thead>
                 </table>
               </div>
+              -->
 
               <div class="col-md-12 mt-4">
                 <button type="button" class="btn btn-secondary btn-back">Cancel</button>
@@ -223,11 +254,11 @@ var editAction = '';
 var tempRows = [];
 
   $(document).ready(function() {
-    preparePreviewContactTable();
+    // preparePreviewContactTable();
     prepareSavedContactTable();
     prepareFailedContactsTable();
     prepareRadioButtons();
-    getContactList();
+    // getContactList();
 
     $('#edit-new-campaign-rows').val('');
     $('#edit-campaign-action').val('');
