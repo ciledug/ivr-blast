@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class Contact extends Model
 {
+    public $timestamps = false;
+    
     protected $fillable = [
         'campaign_id',
         'account_id',
@@ -13,6 +15,7 @@ class Contact extends Model
         'phone',
         'bill_date',
         'due_date',
+        'total_calls',
         'nominal',
         'extension',
         'callerid',

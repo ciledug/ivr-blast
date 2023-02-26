@@ -44,7 +44,7 @@
                       <div class="col-lg-3 col-md-4 label">Total Data</div>
                     </div>
                     <div class="row">
-                      <div id="dialog-detail-campaign-total-data" class="col-lg-9 col-md-8 h5">{{ $campaign->total_data }}</div>
+                      <div id="dialog-detail-campaign-total-data" class="col-lg-9 col-md-8 h5">{{ number_format($campaign->total_data, 0, ',', '.') }}</div>
                     </div>
                   </div>
                 </div>
@@ -115,7 +115,7 @@
                       <div class="col-lg-4 col-md-4 label">Total Calls</div>
                     </div>
                     <div class="row">
-                      <div id="dialog-detail-campaign-total-calls" class="col-lg-8 col-md-8 h5">{{ $campaign->total_calls or '0' }}</div>
+                      <div id="dialog-detail-campaign-total-calls" class="col-lg-8 col-md-8 h5">{{ number_format($campaign->total_calls, 0, ',', '.') }}</div>
                     </div>
                   </div>
                 </div>
@@ -126,7 +126,7 @@
                       <div class="col-lg-4 col-md-4 label">Success Calls</div>
                     </div>
                     <div class="row">
-                      <div id="dialog-detail-campaign-success-calls" class="col-lg-8 col-md-8 h5">{{ $campaign->success or '0' }}</div>
+                      <div id="dialog-detail-campaign-success-calls" class="col-lg-8 col-md-8 h5">{{ number_format($campaign->success, 0, ',', '.') }}</div>
                     </div>
                   </div>
                 </div>
@@ -137,7 +137,7 @@
                       <div class="col-lg-4 col-md-4 label">Failed Calls</div>
                     </div>
                     <div class="row">
-                      <div id="dialog-detail-campaign-failed-calls" class="col-lg-8 col-md-8 h5">{{ $campaign->failed or '0' }}</div>
+                      <div id="dialog-detail-campaign-failed-calls" class="col-lg-8 col-md-8 h5">{{ number_format($campaign->failed, 0, ',', '.') }}</div>
                     </div>
                   </div>
                 </div>
@@ -175,24 +175,26 @@
               </thead>
 
               <tbody>
-                @foreach ($contacts['data'] AS $keyData => $valueData)
+                @foreach ($contacts AS $keyData => $valueData)
                 <tr>
                   <th>{{ $valueData->account_id }}</th>
                   <td>{{ $valueData->name }}</td>
                   <td>{{ $valueData->phone }}</td>
                   <td>{{ $valueData->bill_date }}</td>
                   <td>{{ $valueData->due_date }}</td>
-                  <td class="text-end">{{ $valueData->nominal }}</td>
-                  <td>{{ $valueData->call_date }}</td>
-                  <td>{{ $valueData->call_response }}</td>
-                  <td class="text-end">{{ $valueData->total_calls }}</td>
-                  <td><a href="{{ route('contact.show') }}/_{{ $valueData->account_id }}/{{ $campaign->id }}" class="btn btn-sm btn-info">Detail</a></td>
+                  <td class="text-end">{{ number_format($valueData->nominal, 0, ',', '.') }}</td>
+                  <td>{{ $valueData->call_date or '-' }}</td>
+                  <td>{{ $valueData->call_response or '-' }}</td>
+                  <td class="text-end">{{ number_format($valueData->total_calls, 0, ',', '.') }}</td>
+                  <td>
+                    <a href="{{ route('contact.show') }}/_{{ $valueData->account_id }}/{{ $campaign->id }}" class="btn btn-sm btn-info">Detail</a>
+                  </td>
                 </tr>
                 @endforeach
               </tbody>
             </table>
 
-            {{ $contacts['data']->links() }}
+            {{ $contacts->links() }}
 
             <!--
             <div class="col-md-12 mt-4">
@@ -313,6 +315,8 @@
   };
 
   function startStopCampaign(campaignKey, currentStatus) {
+    $('#modal-spinner').modal('show');
+
     $.ajax({
       method: 'PUT',
       url: '{{ route('campaign.update.startstop') }}',
@@ -391,9 +395,6 @@
   //     console.log(e.data.csv);
   //   }
   // };
-
-
-
 </script>
 @endpush
 

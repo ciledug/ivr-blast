@@ -22,7 +22,7 @@
         <div class="card">
           <div class="card-body">
             <h5 class="card-title">
-              Reset Password
+              Reset Password for {{ $user->username }} ({{ $user->name }})
             </h5>
 
             <form id="form-reset-password" class="row g-3 needs-validation" method="POST" action="{{ route('user.update.password') }}" enctype="multipart/form-data" novalidate>

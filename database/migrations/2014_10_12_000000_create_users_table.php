@@ -20,9 +20,9 @@ class CreateUsersTable extends Migration
             $table->increments('id');
             $table->string('name', 50);
             $table->string('username', 20)->unique();
-            $table->string('email', 50)->unique()->default(null)->nullable();
+            $table->string('email', 50)->unique()->nullable();
             $table->string('password', 70);
-            $table->string('added_by', 30)->default(null)->nullable();
+            $table->tinyInteger('added_by')->unsigned()->nullable();
             $table->rememberToken()->nullable();
             $table->timestamps();
             $table->softDeletes();

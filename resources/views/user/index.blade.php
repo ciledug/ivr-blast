@@ -39,7 +39,27 @@
                   <th scope="col">Action</th>
                 </tr>
               </thead>
+
+              <tbody>
+                @foreach($users AS $keyUser => $valueUser)
+                  <tr>
+                    <td class="text-end">{{ $loop->index + 1 }}.</td>
+                    <td>{{ $valueUser->name }}</td>
+                    <td>{{ $valueUser->username }}</td>
+                    <td>{{ $valueUser->last_login }}</td>
+                    <td>{{ $valueUser->last_ip_address }}</td>
+                    <td>{{ $valueUser->added_by->username or '-' }}</td>
+                    <td>
+                      <a href="{{ route('user.resetpass') }}/_{{ $valueUser->username }}" class="btn btn-sm btn-info">Password</a>&nbsp;
+                      <a href="{{ route('user.edit') }}/_{{ $valueUser->username }}" class="btn btn-sm btn-warning">Edit</a>&nbsp;
+                      <a href="{{ route('user.delete') }}/_{{ $valueUser->username }}" class="btn btn-sm btn-danger">Delete</a>
+                    </td>
+                  </tr>
+                @endforeach
+              </tbody>
             </table>
+
+            {{ $users->links() }}
 
           </div>
         </div>
@@ -52,13 +72,12 @@
 @push('javascript')
 <script type="text/javascript">
   $(document).ready(function() {
-    prepareUserListTable();
-    // getUserList(userListContainer);
+    // prepareUserListTable();
   });
 
+  /*
   var userListContainer = '';
   var userList = [];
-
   function prepareUserListTable() {
     userListContainer = $('#table-user-list-container').DataTable({
       processing: true,
@@ -105,6 +124,7 @@
       ]
     });
   }
+  */
 </script>
 @endpush
 

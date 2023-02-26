@@ -39,7 +39,49 @@
                   <th scope="col">Action</th>
                 </tr>
               </thead>
+
+              <tbody>
+                @foreach ($campaigns AS $keyCampaign => $valueCampaign)
+                <tr>
+                  <td>{{ $loop->index + 1 }}.</td>
+                  <td>{{ $valueCampaign->created }}</td>
+                  <td>{{ $valueCampaign->name }}</td>
+                  <td class="text-end">{{ number_format($valueCampaign->total_data, 0, ',', '.') }}</td>
+                  <td>{{ ucwords($valueCampaign->status) }}</td>
+                  <td>{{ $valueCampaign->created_by }}</td>
+                  <td>
+                    @if ($valueCampaign->status === 'ready')
+                    <button type="button" class="btn btn-sm btn-success btn-start-stop" data-key="_{{ $valueCampaign->unique_key}}" onclick="startStopCampaign('{{ $valueCampaign->unique_key }}', '{{ $valueCampaign->status }}')">Start</button>
+                    @elseif ($valueCampaign->status === 'running')
+                    <button type="button" class="btn btn-sm btn-danger btn-start-stop" data-key="_{{ $valueCampaign->unique_key}}" onclick="startStopCampaign('{{ $valueCampaign->unique_key }}', '{{ $valueCampaign->status }}')">Paused</button>
+                    @elseif ($valueCampaign->status === 'paused')
+                    <button type="button" class="btn btn-sm btn-success btn-start-stop" data-key="_{{ $valueCampaign->unique_key}}" onclick="startStopCampaign('{{ $valueCampaign->unique_key }}', '{{ $valueCampaign->status }}')">Resume</button>
+                    @elseif ($valueCampaign->status === 'finished')
+                    <button type="button" class="btn btn-sm btn-success disabled">Start</button>
+                    @endif
+
+                    <a href="{{ route('campaign.show') }}/_{{ $valueCampaign->unique_key }}" class="btn btn-sm btn-info btn-modal-spinner">Detail</a>
+
+                    @if ($valueCampaign->status !== 'ready')
+                    <a href="#" class="btn btn-sm btn-warning-outline disabled">Edit</a>
+                    @else
+                    <a href="{{ route('campaign.edit') }}/_{{ $valueCampaign->unique_key }}" class="btn btn-sm btn-warning btn-modal-spinner">Edit</a>
+                    @endif
+                    
+
+                    @if ($valueCampaign->status !== 'ready')
+                    <a href="{{ route('campaign.delete') }}/_{{ $valueCampaign->unique_key }}" class="btn btn-sm btn-outline-danger disabled">Delete</a>
+                    @else
+                    <a href="{{ route('campaign.delete') }}/_{{ $valueCampaign->unique_key }}" class="btn btn-sm btn-danger btn-modal-spinner">Delete</a>
+                    @endif
+                  </td>
+                </tr>
+                @endforeach
+              </tbody>
             </table>
+
+            {{ $campaigns->links() }}
+
           </div>
         </div>
 
@@ -50,11 +92,14 @@
 
 @push('javascript')
 <script type="text/javascript">
-var campaignListContainer = '';
-var campaignList = [];
+// var campaignListContainer = '';
+// var campaignList = [];
 
   $(document).ready(function() {
-    prepareCampaignListTable();
+    // prepareCampaignListTable();
+    $('.btn-modal-spinner').click(function(e) {
+      $('#modal-spinner').modal('show');
+    });
   });
 
   function startStopCampaign(campaignKey, currentStatus) {
@@ -74,8 +119,8 @@ var campaignList = [];
       contentType: 'application/json',
       cache: false,
       success: function(response) {
-        // getCampaignList();
-        campaignListContainer.ajax.reload();
+        // campaignListContainer.ajax.reload();
+        location.reload();
       },
       error: function(error) {
         console.log(error.responseText);
@@ -85,6 +130,7 @@ var campaignList = [];
     });
   };
 
+  /*
   function prepareCampaignListTable() {
     campaignListContainer = $('#table-campaign-list-container').DataTable({
       processing: true,
@@ -154,6 +200,7 @@ var campaignList = [];
       ]
     });
   };
+  */
 </script>
 @endpush
 

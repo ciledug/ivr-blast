@@ -20,7 +20,9 @@ class UserController extends Controller
     
     public function index()
     {
-        return view('user.index');
+        return view('user.index', [
+            'users' => $this->getUserList(),
+        ]);
     }
 
     public function create(Request $request)
@@ -76,7 +78,7 @@ class UserController extends Controller
             'username' => $request->username,
             'email' => $request->email,
             'password' => Hash::make($request->password),
-            'added_by' => Auth::user()->name,
+            'added_by' => Auth::user()->id,
         ]);
 
         return redirect()->route('user');
@@ -154,52 +156,6 @@ class UserController extends Controller
         else {
             return back();
         }
-    }
-
-    public function getUserList(Request $request)
-    {
-        $returnedResponse = array(
-            'code' => 500,
-            'message' => 'Server Error',
-            'count' => 0,
-            'data' => [],
-        );
-
-        $users = User::select(['name', 'username', 'email', 'added_by'])
-            ->whereNull('users.deleted_at')
-            ->orderBy('users.name', 'DESC')
-            ->get();
-
-        if ($users) {
-            $returnedResponse['code'] = 200;
-            $returnedResponse['message'] = 'OK';
-            $returnedResponse['count'] = $users->count();
-            $tempData = array();
-
-            if ($users->count() > 0) {
-                foreach ($users AS $keyUser => $valueUser) {
-                    $userLog = UserLog::select(['last_login', 'last_ip_address'])
-                        ->where('user_id', '=', $valueUser->id)
-                        ->orderBy('last_login', 'DESC')
-                        ->first();
-                    // dd($userLog);
-
-                    $tempData[] = array(
-                        'name' => $valueUser->name,
-                        'username' => $valueUser->username,
-                        'email' => $valueUser->email,
-                        'added_by' => $valueUser->added_by,
-                        'last_login' => $userLog ? $userLog->last_login : '',
-                        'last_ip_address' => $userLog ? $userLog->last_ip_address : '',
-                    );
-                }
-            }
-            
-            
-            $returnedResponse['data'] = $tempData;
-        }
-
-        return response()->json($returnedResponse);
     }
 
     public function getUserListAjax(Request $request)
@@ -302,4 +258,29 @@ class UserController extends Controller
         }
     }
 
+    private function getUserList()
+    {
+        $users = User::select(['id', 'name', 'username', 'email', 'added_by'])
+            ->orderBy('users.name', 'DESC')
+            ->paginate(15);
+
+        if ($users->count() > 0) {
+            foreach ($users AS $keyUser => $valueUser) {
+                $addedBy = User::select('name', 'username')
+                    ->where('id', '=', $valueUser->added_by)
+                    ->first();
+
+                $userLog = UserLog::select(['last_login', 'last_ip_address'])
+                    ->where('user_id', '=', $valueUser->id)
+                    ->orderBy('id', 'DESC')
+                    ->first();
+
+                $users[$keyUser]['added_by'] = $addedBy;
+                $users[$keyUser]['last_login'] = $userLog ? $userLog->last_login : '-';
+                $users[$keyUser]['last_ip_address'] = $userLog ? $userLog->last_ip_address : '-';
+            }
+        }
+
+        return $users;
+    }
 }

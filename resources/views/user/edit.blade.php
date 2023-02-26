@@ -21,7 +21,7 @@
         <div class="card">
           <div class="card-body">
             <h5 class="card-title">
-                Update User
+                Update User for {{ $user->username }} ({{ $user->name }})
             </h5>
             
             <form id="form-update-user" class="row g-3 needs-validation" method="POST" action="{{ route('user.update') }}" enctype="multipart/form-data" novalidate>

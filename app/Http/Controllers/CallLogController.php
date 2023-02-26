@@ -12,6 +12,8 @@ use Validator;
 
 class CallLogController extends Controller
 {
+    private $ITEMS_PER_PAGE = 15;
+
     public function __construct()
     {
         // $this->middleware('auth');
@@ -20,10 +22,11 @@ class CallLogController extends Controller
     public function index($campaign=null)
     {
         $campaigns = Campaign::select('id', 'unique_key', 'name')->get();
+        $campaignMaxId = Campaign::select('id')->orderBy('id', 'DESC')->first();
         $callLogs = array();
 
         $validator = Validator::make(['campaign' => $campaign], [
-            'campaign' => 'nullable|numeric|min:1|max:' . $campaigns->count()
+            'campaign' => 'nullable|numeric|min:1|max:' . $campaignMaxId->id
         ]);
         if ($validator->fails()) return back();
 
@@ -38,7 +41,7 @@ class CallLogController extends Controller
             $callLogs->where('contacts.campaign_id', '=', $campaign);
         }
 
-        $callLogs = $callLogs->paginate(15);
+        $callLogs = $callLogs->paginate($this->ITEMS_PER_PAGE);
 
         return view('calllogs.index', array(
             'campaigns' => $campaigns,

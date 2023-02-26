@@ -59,26 +59,6 @@
                       <th scope="col">Nominal</th>
                     </tr>
                   </thead>
-
-                  @if (session('success_contacts'))
-                    @php
-                      $successContacts = json_decode(session('success_contacts'))
-                    @endphp
-
-                    @foreach ($successContacts AS $successContact)
-                      <tbody>
-                        <tr>
-                          {{-- <td scope="col">#</td> --}}
-                          <td scope="col">{{ $successContact->account_id }}</td>
-                          <td scope="col">{{ $successContact->name }}</td>
-                          <td scope="col">{{ $successContact->phone }}</td>
-                          <td scope="col">{{ $successContact->bill_date }}</td>
-                          <td scope="col">{{ $successContact->due_date }}</td>
-                          <td scope="col">{{ $successContact->nominal }}</td>
-                        </tr>
-                      </tbody>
-                    @endforeach
-                  @endif
                 </table>
               </div>
 

@@ -22,6 +22,7 @@ use PDF;
 
 class CampaignController extends Controller
 {
+    private $ITEMS_PER_PAGE = 15;
 
     public function __construct()
     {
@@ -30,7 +31,9 @@ class CampaignController extends Controller
     
     public function index()
     {
-        return view('campaign.index');
+        return view('campaign.index', [
+            'campaigns' => $this->getCampaignListCommon(),
+        ]);
     }
 
     public function create(Request $request)
@@ -68,7 +71,7 @@ class CampaignController extends Controller
         $data = array(
             'campaign' => $this->getCampaignData($request, $campaign),
         );
-        $data['contacts'] = $this->getContactListCommon($request, $campaign);
+        $data['contacts'] = $this->getContactListCommon($request, $data['campaign']->id);
         // dd($data);
 
         return view('campaign.show', $data);
@@ -82,7 +85,7 @@ class CampaignController extends Controller
 
         if ($campaignData) {
             $data['campaign'] = $campaignData;
-            $data['contacts'] = $this->getContactListCommon($request, $campaign);
+            $data['contacts'] = $this->getContactListCommon($request, $campaignData->id);
         }
 
         return view('campaign.edit', $data);
@@ -233,85 +236,29 @@ class CampaignController extends Controller
         return redirect()->route('campaign');
     }
 
-    public function getCampaignList(Request $request)
+    private function getCampaignListCommon()
     {
-        $returnedCode = 500;
-        $campaignList = array();
-
-        $query = Campaign::select(DB::raw('
-                campaigns.id AS campaign_id, campaigns.unique_key, campaigns.name, campaigns.total_data, campaigns.total_calls, campaigns.created_by,
-                IF (campaigns.status = 0, "Ready", IF (campaigns.status = 1, "Running", IF (campaigns.status = 2, "Paused", "Finished"))) AS status,
+        $campaigns = Campaign::select(DB::raw('
+                campaigns.id AS campaign_id,
+                campaigns.unique_key,
+                campaigns.name,
+                campaigns.total_data,
+                users.name AS created_by,
+                IF (campaigns.status = 0, "ready", IF (campaigns.status = 1, "running", IF (campaigns.status = 2, "paused", "finished"))) AS status,
                 DATE_FORMAT(campaigns.created_at, "%d/%m/%Y - %H:%i") AS created,
-                (SELECT COUNT(contacts.call_dial) FROM contacts WHERE contacts.campaign_id = campaigns.id AND contacts.call_dial IS NOT NULL) AS call_dial
+                (SELECT COUNT(contacts.id) FROM contacts WHERE contacts.campaign_id = campaigns.id) AS total_call_dialed
             '))
-            ->whereNull('campaigns.deleted_at')
-            ->orderBy('campaigns.created_at', 'desc');
-        $campaignData = $query->get();
+            ->leftJoin('users', 'campaigns.created_by', '=', 'users.id')
+            ->orderBy('campaigns.name', 'ASC')
+            ->paginate($this->ITEMS_PER_PAGE);
 
-        if ($campaignData) {
-            $returnedCode = 200;
-
-            if (count($campaignData) > 0) {
-                $seq = 1;
-                $tempFailedCalls = 0;
-                $tempStartDate = '';
-                $tempFinishDate = '';
-                $tempProgress = 0;
-
-                foreach ($campaignData AS $keyCampaignData => $valueCampaignData) {
-                    $tempProgress = 0;
-                    if ($valueCampaignData->call_dial > 0) {
-                        $tempProgress = ($valueCampaignData->call_dial / $valueCampaignData->total_data) * 100;
-                    }
-
-                    $tempFailedCalls = CallLog::select('call_logs.contact_id')
-                        ->where('contacts.campaign_id', '=', $valueCampaignData->campaign_id)
-                        ->where('call_logs.call_response', '=', 3)
-                        ->leftJoin('contacts', 'call_logs.contact_id', '=', 'contacts.id')
-                        ->orderBy('call_logs.created_at', 'DESC')
-                        ->count('call_logs.contact_id');
-
-                    $tempStartDate = Contact::select(DB::raw('
-                            DATE_FORMAT(MIN(call_logs.call_dial), "%d/%m/%Y %H:%i") AS started
-                        '))
-                        ->where('contacts.campaign_id', '=', $valueCampaignData->campaign_id)
-                        ->leftJoin('call_logs', 'contacts.id', '=', 'call_logs.contact_id')
-                        ->first();
-
-                    $tempFinishDate = Contact::select(DB::raw('
-                            DATE_FORMAT(MAX(call_logs.call_disconnect), "%d/%m/%Y %H:%i") AS finished
-                        '))
-                        ->where('contacts.campaign_id', '=', $valueCampaignData->campaign_id)
-                        ->leftJoin('call_logs', 'contacts.id', '=', 'call_logs.contact_id')
-                        ->first();
-
-                    $campaignList[] = array(
-                        'seq' => $seq,
-                        'created' => $valueCampaignData->created,
-                        'name' => $valueCampaignData->name,
-                        'started' => $tempStartDate->started,
-                        'finished' => $tempFinishDate->finished,
-                        'total' => $valueCampaignData->total_data,
-                        'total_calls' => $valueCampaignData->total_calls,
-                        'call_dial' => $valueCampaignData->call_dial,
-                        'call_connect' => $valueCampaignData->call_connect,
-                        'call_failed' => $tempFailedCalls,
-                        'status' => $valueCampaignData->status,
-                        'created_by' => $valueCampaignData->created_by,
-                        'key' => $valueCampaignData->unique_key,
-                        'progress' => $tempProgress,
-                    );
-                    $seq++;
-                }
+        foreach ($campaigns AS $keyCampaign => $valueCampaign) {
+            if ($valueCampaign->total_call_dialed && ($valueCampaign->total_call_dialed > 0)) {
+                $campaigns[$keyCampaign]['progress'] = ($valueCampaign->total_call_dialed / $valueCampaign->total_data) * 100;
             }
         }
 
-        $returnedResponse = array(
-            'code' => $returnedCode,
-            'data' => $campaignList
-        );
-
-        return response()->json($returnedResponse);
+        return $campaigns;
     }
 
     public function updateStartStop(Request $request)
@@ -770,73 +717,10 @@ class CampaignController extends Controller
     }
 
     private function getContactListCommon($request, $campaign) {
-        $ORDERED_COLUMNS = ['account_id', 'name', 'phone', 'bill_date', 'due_date', 'total_calls', 'nominal', 'call_dial', 'call_response'];
-        $ORDERED_BY = ['desc', 'asc'];
+        $contacts = Contact::where('campaign_id', '=', $campaign)
+            ->orderBy('name', 'ASC')
+            ->paginate($this->ITEMS_PER_PAGE);
 
-        $COLUMN_IDX = is_numeric($request->order[0]['column']) ? $request->order[0]['column'] : 0;
-        $START = is_numeric($request->start) ? (int) $request->start : 0;
-        $LENGTH = is_numeric($request->length) ? (int) $request->length : 10;
-        $SEARCH_VALUE = !empty($request->search['value']) ? $request->search['value'] : '';
-
-        $campaign = Campaign::where('unique_key', '=', Str::replaceFirst('_', '', $campaign))->first();
-        // dd($campaign);
-
-        $recordsTotalQuery = 0;
-        $contactList = [];
-
-        if ($campaign) {
-            $query = Contact::select(DB::raw('
-                    id,
-                    account_id,
-                    contacts.name AS name,
-                    phone,
-                    DATE_FORMAT(bill_date, "%d/%m/%Y") AS bill_date,
-                    DATE_FORMAT(due_date, "%d/%m/%Y") AS due_date,
-                    IF (total_calls IS NULL, 0, total_calls) AS total_calls,
-                    FORMAT(nominal, 0) AS nominal
-                '))
-                ->where('campaign_id', '=', $campaign->id);
-
-            if (!empty($SEARCH_VALUE)) {
-                $query->where(function($q) use($SEARCH_VALUE) {
-                    $q->where('contacts.account_id', 'LIKE', '%' . $SEARCH_VALUE . '%')
-                        ->orWhere('contacts.name', 'LIKE', '%' . $SEARCH_VALUE . '%')
-                        ->orwhere('contacts.phone', 'LIKE', '%' . $SEARCH_VALUE . '%')
-                        ->orwhere('bill_date', 'LIKE', '%' . $SEARCH_VALUE . '%')
-                        ->orwhere('due_date', 'LIKE', '%' . $SEARCH_VALUE . '%')
-                        ->orwhere('nominal', 'LIKE', '%' . $SEARCH_VALUE . '%')
-                        ->orwhere('call_dial', 'LIKE', '%' . $SEARCH_VALUE . '%');
-                });
-            }
-
-            if (in_array($request->order[0]['dir'], $ORDERED_BY)) {
-                $query->orderBy($ORDERED_COLUMNS[$COLUMN_IDX], $request->order[0]['dir']);
-            }
-            $filteredData = $query->get();
-            // $contactList = $query->offset($START)->limit($LENGTH)->get();
-            $contactList = $query->paginate(15);
-
-            foreach ($contactList AS $keyContact => $valueContact) {
-                $contactList[$keyContact]->call_dial = '-';
-                $contactList[$keyContact]->call_response = '-';
-                $tempCallLog = CallLog::select('call_dial', 'call_response')
-                    ->where('contact_id', '=', $valueContact->id)
-                    ->orderBy('id', 'DESC')
-                    ->first();
-                if ($tempCallLog) {
-                    $contactList[$keyContact]->call_dial = $tempCallLog->call_dial;
-                    $contactList[$keyContact]->call_response = ucwords($tempCallLog->call_response);
-                }
-            }
-        }
-
-        $returnedResponse = array(
-            'draw' => $request->draw,
-            'recordsTotal' => Contact::where('contacts.campaign_id', '=', $campaign->id)->count(),
-            'recordsFiltered' => $filteredData->count(),
-            'data' => $contactList
-        );
-
-        return $returnedResponse;
+        return $contacts;
     }
 }

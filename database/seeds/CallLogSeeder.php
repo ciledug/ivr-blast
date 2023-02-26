@@ -3,6 +3,7 @@
 use Illuminate\Database\Seeder;
 use Carbon\Carbon;
 use Faker\Factory as Faker;
+use App\Contact;
 
 class CallLogSeeder extends Seeder
 {
@@ -13,7 +14,7 @@ class CallLogSeeder extends Seeder
      */
     public function run()
     {
-        $DUMMY_COUNT = 300;
+        $DUMMY_COUNT = 1000;
         $DUMMY_CALL_RECORDING_FILE = 'call_recording.mp3';
 
         $faker = Faker::create('id_ID');
@@ -40,7 +41,7 @@ class CallLogSeeder extends Seeder
     
             if ($randConnect % 2 == 0) {
                 $callConnect = Carbon::now('Asia/Jakarta')->addSeconds($faker->numberBetween(1, 61));
-                $callResponse = (($faker->numberBetween() % 2) == 0) ? 'no_answer' : 'busy';
+                $callResponse = (($faker->numberBetween(1, 2) % 2) == 0) ? 'no_answer' : 'busy';
 
                 if ($randConnect % 4 == 0) {
                     $callDisconnect = Carbon::now('Asia/Jakarta')->addSeconds($faker->numberBetween(60, 121));
@@ -53,7 +54,7 @@ class CallLogSeeder extends Seeder
 
                 $callConnect = $callConnect->format('Y-m-d H:i:s');
             }
-    
+
             DB::table('call_logs')->insert([
                 'contact_id' => $contactId,
                 'call_dial' => $callDial,
@@ -63,6 +64,15 @@ class CallLogSeeder extends Seeder
                 'call_response' => $callResponse,
                 'call_recording' => $callRecording,
             ]);
+
+            $contact = Contact::select('id', 'name', 'total_calls', 'call_dial', 'call_response')
+                ->where('id', '=', $contactId)
+                ->first();
+
+            $contact->total_calls = is_numeric($contact->total_calls) ? $contact->total_calls + 1 : 1;
+            $contact->call_dial = !empty($callDial) ? $callDial : null;
+            $contact->call_response = !empty($callResponse) ? $callResponse : null;
+            $contact->save();
         }
     }
 }

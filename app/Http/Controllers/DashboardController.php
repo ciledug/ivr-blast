@@ -14,9 +14,10 @@ class DashboardController extends Controller
     }
 
     public function index() {
-        $campaignList = array();
-        $campaignsData = Campaign::where('status', '=', 1)
-            ->get();
+        // $campaignsData = Campaign::where('status', '=', 1)->get();
+        $campaignsData = Campaign::select('id', 'name', 'total_data')
+            ->where('status', '=', 1)
+            ->paginate(15);
 
         $totalAnswered = 0;
         $totalNoAnswer = 0;
@@ -24,34 +25,13 @@ class DashboardController extends Controller
         $totalFailed = 0;
 
         foreach($campaignsData AS $keyCampaign => $valueCampaign) {
-            $contactsData = Contact::where('campaign_id', '=', $valueCampaign->id)->get();
+            $answered = Contact::where('campaign_id', '=', $valueCampaign->id)->where('call_response', '=', 'answered')->count();
+            $noAnswer = Contact::where('campaign_id', '=', $valueCampaign->id)->where('call_response', '=', 'no_answer')->count();
+            $busy = Contact::where('campaign_id', '=', $valueCampaign->id)->where('call_response', '=', 'busy')->count();
+            $failed = Contact::where('campaign_id', '=', $valueCampaign->id)->where('call_response', '=', 'failed')->count();
 
-            $answered = 0;
-            $noAnswer = 0;
-            $busy = 0;
-            $failed = 0;
-
-            foreach($contactsData AS $keyContact => $valueContact) {
-                $callLogData = CallLog::select('call_response')
-                    ->where('contact_id', '=', $valueContact->id)
-                    ->orderBy('id', 'desc')
-                    ->first();
-
-                if ($callLogData) {
-                    if ($callLogData->call_response == 'answered') $answered++;
-                    else if ($callLogData->call_response == 'no_answer') $noAnswer++;
-                    else if ($callLogData->call_response == 'busy') $busy++;
-                    else if ($callLogData->call_response == 'failed') $failed++;
-                }
-            }
-
-            $totalContactsData = $contactsData->count();
-            $totalProgress = (($answered + $noAnswer + $busy + $failed) / $totalContactsData) * 100;
-
-            $campaignList[] = array(
-                'name' => $valueCampaign->name,
-                'progress' => number_format($totalProgress, 2, ',', '.'),
-            );
+            $progress = (($answered + $noAnswer + $busy + $failed) / $valueCampaign->total_data) * 100;
+            $campaignsData[$keyCampaign]['progress'] = $progress;
 
             $totalAnswered += $answered;
             $totalNoAnswer += $noAnswer;
@@ -60,14 +40,12 @@ class DashboardController extends Controller
         }
 
         $data = array(
-            'campaigns' => $campaignList,
+            'campaigns' => $campaignsData,
             'answered' => $totalAnswered,
             'noanswer' => $totalNoAnswer,
             'busy' => $totalBusy,
             'failed' => $totalFailed,
         );
-
-        // dd($data['campaigns']);
 
         return view('dashboard.index', $data);
     }

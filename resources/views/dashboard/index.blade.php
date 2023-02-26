@@ -23,24 +23,28 @@
           <div class="card">
             <div class="card-body">
               <h5 class="card-title">Running Campaigns</h5>
+
               <table id="table-running-campaign-list-container" class="table table-hover">
                 <thead>
                   <tr>
                     <th scope="col">#</th>
                     <th scope="col">Name</th>
-                    <th scope="col">Call Progress (%)</th>
+                    <th scope="col" class="text-end">Call Progress (%)</th>
                   </tr>
                 </thead>
+
                 <tbody>
                   @foreach ($campaigns AS $campaign)
                   <tr>
-                    <td scope="col"></td>
-                    <td scope="col">{{ $campaign['name'] }}</td>
-                    <td scope="col">{{ $campaign['progress'] }}</td>
+                    <td class="text-end">{{ $loop->index + 1 }}.</td>
+                    <td>{{ $campaign['name'] }}</td>
+                    <td class="text-end">{{ number_format($campaign['progress'], 2, ',', '.') }}</td>
                   </tr>
                   @endforeach
                 </tbody>
               </table>
+
+              {{ $campaigns->links() }}
             </div>
           </div>
         </div>
@@ -69,14 +73,15 @@
   var callsChart = '';
 
   $(document).ready(function() {
-    prepareTableContainer();
+    // prepareTableContainer();
     prepareChart('chart-total-calls');
   });
 
+  /*
   function prepareTableContainer() {
     dataTableContainer = $('#table-running-campaign-list-container').DataTable({
       processing: true,
-      lengthMenu: [5, 10, 15, 20, 50, 100],
+      lengthMenu: [1, 10, 15, 20, 50, 100],
       pageLength: 10,
       responsive: true,
       columns: [
@@ -89,6 +94,7 @@
           targets: 0,
           orderable: false,
           render: function(data, type, row, meta) {
+            console.log('hai');
             return ++meta.row + '.';
           }
         },
@@ -99,6 +105,7 @@
       ],
     });
   };
+  */
 
   function prepareChart(chartContainer) {
     callsChart = echarts.init(document.getElementById(chartContainer));

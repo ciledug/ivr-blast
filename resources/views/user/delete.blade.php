@@ -21,7 +21,7 @@
         <div class="card">
           <div class="card-body">
             <h5 class="card-title">
-                Delete User
+                Delete User for {{ $user->username }} ({{ $user->name }})
             </h5>
             
             <form id="form-delete-user" class="row g-3 needs-validation" method="POST" action="{{ route('user.destroy') }}" enctype="multipart/form-data" novalidate>
