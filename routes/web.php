@@ -70,6 +70,7 @@ Route::group(
         Route::prefix('calllog')->group(function() {
             Route::get('/{campaign?}', 'CallLogController@index')->name('calllogs');
             Route::get('/{startDate?}/{endDate?}', 'CallLogController@getCallStatus')->name('callog.status');
+            Route::post('export', 'CallLogController@exportData')->name('calllog.export');
         });
     }
 );

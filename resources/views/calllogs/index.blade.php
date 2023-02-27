@@ -79,11 +79,11 @@
             {{ $calllogs->links() }}
 
             <div class="col-md-12 mt-4">
-              <form id="form-campaign-export" class="g-3 needs-validation" method="POST" target="_blank" action="#" enctype="multipart/form-data">
+              <form id="form-campaign-export" class="g-3 needs-validation" method="POST" target="_blank" action="{{ route('calllog.export') }}" enctype="multipart/form-data">
                 <button type="button" class="btn btn-success btn-export-as" id="btn-export-excel" data-export-as="excel">Export Excel</button>
                 <button type="button" class="btn btn-danger btn-export-as" id="btn-export-pdf" data-export-as="pdf">Export PDF</button>
                 <input type="hidden" id="campaign-export-type" name="export_type" value="">
-                <input type="hidden" id="campaign-export-key" name="campaign" value="">
+                <input type="hidden" id="campaign-export" name="campaign" value="{{ $selectedCampaign or '' }}">
                 {{ csrf_field() }}
               </form>
             </div>
@@ -121,11 +121,21 @@
 <script type="text/javascript">
   $(document).ready(function() {
     preparePlayRecordingButtons();
-    changeCampaign();
+    prepareChangeCampaignDropDown();
 
     $('#btn-close-play-recording').click(function(e) {
       audio.pause();
       audio.currentTime = 0;
+    });
+
+    $('#btn-export-excel').click(function(e) {
+      $('#campaign-export-type').val('excel');
+      $('#form-campaign-export').submit();
+    });
+
+    $('#btn-export-pdf').click(function(e) {
+      $('#campaign-export-type').val('pdf');
+      $('#form-campaign-export').submit();
     });
   });
 
@@ -137,7 +147,7 @@
     });
   };
 
-  function changeCampaign() {
+  function prepareChangeCampaignDropDown() {
     $('#select-campaign-list').change(function() {
       $('#modal-spinner').modal('show');
       location.href = '{{ route('calllogs') }}/' + $(this).find(':selected').val();
