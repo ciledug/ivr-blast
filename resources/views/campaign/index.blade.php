@@ -62,15 +62,14 @@
 
                     <a href="{{ route('campaign.show') }}/_{{ $valueCampaign->unique_key }}" class="btn btn-sm btn-info btn-modal-spinner">Detail</a>
 
-                    @if ($valueCampaign->status !== 'ready')
-                    <a href="#" class="btn btn-sm btn-warning-outline disabled">Edit</a>
+                    @if (($valueCampaign->total_call_dialed > 0) || ($valueCampaign->status !== 'ready'))
+                    <!-- <a href="#" class="btn btn-sm btn-warning-outline disabled">Edit</a> -->
                     @else
                     <a href="{{ route('campaign.edit') }}/_{{ $valueCampaign->unique_key }}" class="btn btn-sm btn-warning btn-modal-spinner">Edit</a>
                     @endif
                     
-
-                    @if ($valueCampaign->status !== 'ready')
-                    <a href="{{ route('campaign.delete') }}/_{{ $valueCampaign->unique_key }}" class="btn btn-sm btn-outline-danger disabled">Delete</a>
+                    @if (($valueCampaign->total_call_dialed > 0) || ($valueCampaign->status !== 'ready'))
+                    <!-- <a href="{{ route('campaign.delete') }}/_{{ $valueCampaign->unique_key }}" class="btn btn-sm btn-outline-danger disabled">Delete</a> -->
                     @else
                     <a href="{{ route('campaign.delete') }}/_{{ $valueCampaign->unique_key }}" class="btn btn-sm btn-danger btn-modal-spinner">Delete</a>
                     @endif

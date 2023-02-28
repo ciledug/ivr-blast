@@ -246,11 +246,12 @@ class CampaignController extends Controller
                 users.name AS created_by,
                 IF (campaigns.status = 0, "ready", IF (campaigns.status = 1, "running", IF (campaigns.status = 2, "paused", "finished"))) AS status,
                 DATE_FORMAT(campaigns.created_at, "%d/%m/%Y - %H:%i") AS created,
-                (SELECT COUNT(contacts.id) FROM contacts WHERE contacts.campaign_id = campaigns.id) AS total_call_dialed
+                (SELECT COUNT(contacts.id) FROM contacts WHERE contacts.campaign_id = campaigns.id AND contacts.call_dial IS NOT NULL) AS total_call_dialed
             '))
             ->leftJoin('users', 'campaigns.created_by', '=', 'users.id')
             ->orderBy('campaigns.name', 'ASC')
             ->paginate($this->ITEMS_PER_PAGE);
+        // dd($campaigns);
 
         foreach ($campaigns AS $keyCampaign => $valueCampaign) {
             if ($valueCampaign->total_call_dialed && ($valueCampaign->total_call_dialed > 0)) {
