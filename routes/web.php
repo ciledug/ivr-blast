@@ -20,6 +20,7 @@ Route::group(
     function() {
         // Route::get('/home', 'HomeController@index')->name('home');
         Route::get('/dashboard', "DashboardController@index")->name('dashboard');
+        Route::get('/dashboard/stream', 'DashboardController@stream')->name('dashboard.stream');
 
         Route::prefix('campaign')->group(function() {
             Route::get('/', "CampaignController@index")->name('campaign');
@@ -68,9 +69,10 @@ Route::group(
         });
         
         Route::prefix('calllog')->group(function() {
-            Route::get('/{campaign?}', 'CallLogController@index')->name('calllogs');
+            Route::get('/', 'CallLogController@index')->name('calllogs');
             Route::get('/{startDate?}/{endDate?}', 'CallLogController@getCallStatus')->name('callog.status');
             Route::post('export', 'CallLogController@exportData')->name('calllog.export');
+            Route::get('/recording', 'CallLogController@recording')->name('calllog.recording');
         });
     }
 );

@@ -23,28 +23,32 @@ class ContactController extends Controller
 
     public function show(Request $request, $contact=null, $campaign=null)
     {
-        $data = array(
-            'contact' => array()
-        );
+        $idcontact = Str::replaceFirst('_', '', $contact);
 
-        $contact = Contact::select([
-                'contacts.id', 'contacts.account_id', 'contacts.name', 'contacts.phone', 'contacts.bill_date', 'contacts.due_date', 'contacts.total_calls', 'contacts.nominal',
-                'call_logs.call_dial', 'call_logs.call_connect', 'call_logs.call_disconnect', 'call_logs.call_duration', 'call_logs.call_response'
-            ])
-            ->leftJoin('call_logs', 'call_logs.contact_id', '=', 'contacts.id')
-            ->where('contacts.campaign_id', '=', $campaign)
-            ->where('contacts.account_id', '=', Str::replaceFirst('_', '', $contact))
-            ->orderBy('call_logs.id', 'DESC')
-            ->first();
+        $dataContact = Contact::where('account_id', $idcontact)->first();
+        $dataLogs = CallLog::where('contact_id', $dataContact->id)->orderBy('id','ASC')->get();       
+        // $data = array(
+        //     'contact' => array()
+        // );
 
-        if ($contact) {
-            $contact->nominal = number_format($contact->nominal, 0, ',', '.');
-            $contact->call_response = $contact->call_response ? ucwords($contact->call_response) : '-';
-            $data['contact'] = $contact;
-        }
+        // $contact = Contact::select([
+        //         'contacts.account_id', 'contacts.name', 'contacts.phone', 'contacts.bill_date', 'contacts.due_date', 'contacts.total_calls', 'contacts.nominal',
+        //         'call_logs.call_dial', 'call_logs.call_connect', 'call_logs.call_disconnect', 'call_logs.call_duration', 'call_logs.call_response'
+        //     ])
+        //     ->leftJoin('call_logs', 'call_logs.contact_id', '=', 'contacts.id')
+        //     ->where('contacts.campaign_id', '=', $campaign)
+        //     ->where('contacts.account_id', '=', Str::replaceFirst('_', '', $contact))
+        //     ->orderBy('call_logs.id', 'DESC')
+        //     ->first();
+
+        // if ($contact) {
+        //     $contact->nominal = number_format($contact->nominal, 0, ',', '.');
+        //     $contact->call_response = $contact->call_response ? ucwords($contact->call_response) : '-';
+        //     $data['contact'] = $contact;
+        // }
         
-        // dd($data);
-        return view('contact.show', $data);
+        // // dd($data);
+        return view('contact.show', compact('dataContact', 'dataLogs'));
     }
 
     public function contactList(Request $request, $campaign) {

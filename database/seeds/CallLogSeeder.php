@@ -14,6 +14,8 @@ class CallLogSeeder extends Seeder
      */
     public function run()
     {
+        DB::table('call_logs')->truncate();
+
         $DUMMY_COUNT = 1000;
         $DUMMY_CALL_RECORDING_FILE = 'call_recording.mp3';
 

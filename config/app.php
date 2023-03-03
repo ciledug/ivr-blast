@@ -181,6 +181,7 @@ return [
         Anouar\Fpdf\FpdfServiceProvider::class,
         Barryvdh\DomPDF\ServiceProvider::class,
         Maatwebsite\Excel\ExcelServiceProvider::class,
+        Laravel\Passport\PassportServiceProvider::class,
     ],
 
     /*

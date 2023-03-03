@@ -12,6 +12,9 @@ class CampaignSeeder extends Seeder
      */
     public function run()
     {
+        
+        DB::table('campaigns')->truncate();
+
         $campaignNames = [
             'First Campaign',
             'Second Campaign',

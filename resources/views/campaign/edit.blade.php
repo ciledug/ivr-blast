@@ -217,7 +217,7 @@
                     <td scope="col">{{ $failedContact->bill_date }}</td>
                     <td scope="col">{{ $failedContact->due_date }}</td>
                     <td scope="col">{{ $failedContact->nominal }}</td>
-                    <td scope="col">{{ $failedContact->failed }}</td>
+                    <td scope="col" class="text-danger">{{ $failedContact->failed }}</td>
                   </tr>
                   @endforeach
                 </tbody>

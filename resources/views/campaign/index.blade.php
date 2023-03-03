@@ -4,15 +4,6 @@
 <main id="main" class="main">
   <div class="pagetitle">
     <h1>Campaigns</h1>
-    <!--
-    <nav>
-      <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="index.html">Home</a></li>
-        <li class="breadcrumb-item">Tables</li>
-        <li class="breadcrumb-item active">General</li>
-      </ol>
-    </nav>
-    -->
   </div>
 
   <section class="section">
@@ -30,53 +21,62 @@
             <table id="table-campaign-list-container" class="table table-hover">
               <thead>
                 <tr>
-                  <th scope="col">#</th>
-                  <th scope="col">Date Created</th>
+                  <th scope="col" width="40px">#</th>
+                  <th scope="col" width="160px">Date Created</th>
                   <th scope="col">Name</th>
-                  <th scope="col">Total Data</th>
+                  <th scope="col" width="100px">Total Data</th>
                   <th scope="col">Status</th>
                   <th scope="col">Created By</th>
-                  <th scope="col">Action</th>
+                  <th scope="col" width="250px">Action</th>
                 </tr>
               </thead>
-
               <tbody>
-                @foreach ($campaigns AS $keyCampaign => $valueCampaign)
-                <tr>
-                  <td>{{ $loop->index + 1 }}.</td>
-                  <td>{{ $valueCampaign->created }}</td>
-                  <td>{{ $valueCampaign->name }}</td>
-                  <td class="text-end">{{ number_format($valueCampaign->total_data, 0, ',', '.') }}</td>
-                  <td>{{ ucwords($valueCampaign->status) }}</td>
-                  <td>{{ $valueCampaign->created_by }}</td>
-                  <td>
-                    @if ($valueCampaign->status === 'ready')
-                    <button type="button" class="btn btn-sm btn-success btn-start-stop" data-key="_{{ $valueCampaign->unique_key}}" onclick="startStopCampaign('{{ $valueCampaign->unique_key }}', '{{ $valueCampaign->status }}')">Start</button>
-                    @elseif ($valueCampaign->status === 'running')
-                    <button type="button" class="btn btn-sm btn-danger btn-start-stop" data-key="_{{ $valueCampaign->unique_key}}" onclick="startStopCampaign('{{ $valueCampaign->unique_key }}', '{{ $valueCampaign->status }}')">Paused</button>
-                    @elseif ($valueCampaign->status === 'paused')
-                    <button type="button" class="btn btn-sm btn-success btn-start-stop" data-key="_{{ $valueCampaign->unique_key}}" onclick="startStopCampaign('{{ $valueCampaign->unique_key }}', '{{ $valueCampaign->status }}')">Resume</button>
-                    @elseif ($valueCampaign->status === 'finished')
-                    <button type="button" class="btn btn-sm btn-success disabled">Start</button>
-                    @endif
+                @if($campaigns->count() > 0)
+                  @foreach ($campaigns AS $keyCampaign => $valueCampaign)
+                  <tr>
+                    <td>{{ $loop->index + 1 }}.</td>
+                    <td>{{ $valueCampaign->created }}</td>
+                    <td>{{ $valueCampaign->name }}</td>
+                    <td class="text-end">{{ number_format($valueCampaign->total_data, 0, ',', '.') }}</td>
+                    <td>{{ ucwords($valueCampaign->status) }}</td>
+                    <td>{{ $valueCampaign->created_by }}</td>
+                    <td>
+                      @if ($valueCampaign->status != 'finished')
+                        @if ($valueCampaign->status === 'ready')
+                        <button type="button" class="btn btn-sm btn-success btn-start-stop" data-key="_{{ $valueCampaign->unique_key}}" onclick="startStopCampaign('{{ $valueCampaign->unique_key }}', '{{ $valueCampaign->status }}')">Start</button>
+                        @elseif ($valueCampaign->status === 'running')
+                        <button type="button" class="btn btn-sm btn-danger btn-start-stop" data-key="_{{ $valueCampaign->unique_key}}" onclick="startStopCampaign('{{ $valueCampaign->unique_key }}', '{{ $valueCampaign->status }}')">Paused</button>
+                        @elseif ($valueCampaign->status === 'paused')
+                        <button type="button" class="btn btn-sm btn-success btn-start-stop" data-key="_{{ $valueCampaign->unique_key}}" onclick="startStopCampaign('{{ $valueCampaign->unique_key }}', '{{ $valueCampaign->status }}')">Resume</button>
+                        @endif
+                      @endif
 
-                    <a href="{{ route('campaign.show') }}/_{{ $valueCampaign->unique_key }}" class="btn btn-sm btn-info btn-modal-spinner">Detail</a>
+                      <a href="{{ route('campaign.show') }}/_{{ $valueCampaign->unique_key }}" class="btn btn-sm btn-info btn-modal-spinner">Detail</a>
 
-                    @if ($valueCampaign->status !== 'ready')
-                    <a href="#" class="btn btn-sm btn-warning-outline disabled">Edit</a>
-                    @else
-                    <a href="{{ route('campaign.edit') }}/_{{ $valueCampaign->unique_key }}" class="btn btn-sm btn-warning btn-modal-spinner">Edit</a>
-                    @endif
-                    
+                      @if ($valueCampaign->status != 'finished')
+                        @if ($valueCampaign->status !== 'ready')
+                          <a href="#" class="btn btn-sm btn-warning-outline disabled">Edit</a>
+                        @else
+                          <a href="{{ route('campaign.edit') }}/_{{ $valueCampaign->unique_key }}" class="btn btn-sm btn-warning btn-modal-spinner">Edit</a>
+                        @endif
+                      @endif
+                      
 
-                    @if ($valueCampaign->status !== 'ready')
-                    <a href="{{ route('campaign.delete') }}/_{{ $valueCampaign->unique_key }}" class="btn btn-sm btn-outline-danger disabled">Delete</a>
-                    @else
-                    <a href="{{ route('campaign.delete') }}/_{{ $valueCampaign->unique_key }}" class="btn btn-sm btn-danger btn-modal-spinner">Delete</a>
-                    @endif
-                  </td>
-                </tr>
-                @endforeach
+                      @if ($valueCampaign->status != 'finished')
+                        @if ($valueCampaign->status !== 'ready')
+                          <a href="{{ route('campaign.delete') }}/_{{ $valueCampaign->unique_key }}" class="btn btn-sm btn-outline-danger disabled">Delete</a>
+                        @else
+                          <a href="{{ route('campaign.delete') }}/_{{ $valueCampaign->unique_key }}" class="btn btn-sm btn-danger btn-modal-spinner">Delete</a>
+                        @endif
+                      @endif
+                    </td>
+                  </tr>
+                  @endforeach
+                @else
+                  <tr>
+                    <td colspan="7" class="text-center">There's no campaign data</td>
+                  </tr>
+                @endif  
               </tbody>
             </table>
 

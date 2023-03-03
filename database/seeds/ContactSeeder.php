@@ -13,6 +13,8 @@ class ContactSeeder extends Seeder
      */
     public function run()
     {
+        DB::table('contacts')->truncate();
+
         $faker = Faker::create('id_ID');
         $nextWeek = Carbon::now('Asia/Jakarta')->addDays(7);
 

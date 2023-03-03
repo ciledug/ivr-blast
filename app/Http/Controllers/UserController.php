@@ -261,6 +261,7 @@ class UserController extends Controller
     private function getUserList()
     {
         $users = User::select(['id', 'name', 'username', 'email', 'added_by'])
+            ->where('id', '!=', Auth::id())
             ->orderBy('users.name', 'DESC')
             ->paginate(15);
 

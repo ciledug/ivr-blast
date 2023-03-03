@@ -20,6 +20,8 @@ use Maatwebsite\Excel\Facades\Excel;
 use App;
 use PDF;
 
+use App\Helpers\Helpers;
+
 class CampaignController extends Controller
 {
     private $ITEMS_PER_PAGE = 15;
@@ -249,7 +251,7 @@ class CampaignController extends Controller
                 (SELECT COUNT(contacts.id) FROM contacts WHERE contacts.campaign_id = campaigns.id) AS total_call_dialed
             '))
             ->leftJoin('users', 'campaigns.created_by', '=', 'users.id')
-            ->orderBy('campaigns.name', 'ASC')
+            ->orderBy('campaigns.created_at', 'DESC')
             ->paginate($this->ITEMS_PER_PAGE);
 
         foreach ($campaigns AS $keyCampaign => $valueCampaign) {
@@ -344,7 +346,7 @@ class CampaignController extends Controller
                     ->first();
 
                 if ($tempCallLog) {
-                    $contacts[$keyContact]['CALL_DATE'] = $tempCallLog->call_dial;
+                    $contacts[$keyContact]['CALL_DATE'] = $tempCallLog->call_dial ? date('d/m/Y - H:i', strtotime($tempCallLog->call_dial)) : '-';
                     $contacts[$keyContact]['CALL_RESPONSE'] = ucwords($tempCallLog->call_response);
                 }
 
@@ -384,33 +386,36 @@ class CampaignController extends Controller
                 // );
 
                 $excelDownload = storage_path('app/public/files/Report_IVR_Blast.xlsx');
-
+                
                 Excel::load($excelDownload, function($file) use($campaign, $contacts, $excelDownload) {
                     $sheet = $file->setActiveSheetIndex(0);
                     $sheet->setCellValue('A2', $campaign->name);
-                    $sheet->setCellValue('E2', $campaign->started);
+                    $sheet->setCellValue('E2', $campaign->started ? date('d/m/Y - H:i', strtotime($campaign->started)) : '-');
                     $sheet->setCellValue('A5', $campaign->total_data);
-                    $sheet->setCellValue('E5', $campaign->finished);
+                    $sheet->setCellValue('E5', ($campaign->finished != '-') ? date('d/m/Y - H:i', strtotime($campaign->finished)) : '-');
                     $sheet->setCellValue('A8', $campaign->status);
                     $sheet->setCellValue('E8', $campaign->total_calls);
-                    $sheet->setCellValue('A11', $campaign->created_at);
+                    $sheet->setCellValue('A11', date('d/m/Y - H:i', strtotime($campaign->created_at)));
                     $sheet->setCellValue('E11', $campaign->success);
                     $sheet->setCellValue('A14', $campaign->progress);
                     $sheet->setCellValue('E14', $campaign->failed);
 
                     $excelRowNumber = 17;
-                    foreach ($contacts AS $keyContact => $valueContact) {
-                        $sheet->setCellValue('A' . $excelRowNumber, (string) $valueContact['ACCOUNT_ID']);
-                        $sheet->setCellValue('B' . $excelRowNumber, $valueContact['CONTACT_NAME']);
-                        $sheet->setCellValue('C' . $excelRowNumber, $valueContact['CONTACT_PHONE']);
-                        $sheet->setCellValue('D' . $excelRowNumber, $valueContact['BILL_DATE']);
-                        $sheet->setCellValue('E' . $excelRowNumber, $valueContact['DUE_DATE']);
-                        $sheet->setCellValue('F' . $excelRowNumber, $valueContact['NOMINAL']);
-                        $sheet->setCellValue('G' . $excelRowNumber, $valueContact['TOTAL_CALLS']);
-                        $sheet->setCellValue('H' . $excelRowNumber, $valueContact['CALL_DATE']);
-                        $sheet->setCellValue('I' . $excelRowNumber, $valueContact['CALL_RESPONSE']);
-                        $excelRowNumber++;
+                    foreach ($contacts->chunk(300) as $chunks) {
+                        foreach ($chunks as $valueContact) {
+                            $sheet->setCellValue('A' . $excelRowNumber, (string) $valueContact['ACCOUNT_ID']);
+                            $sheet->setCellValue('B' . $excelRowNumber, $valueContact['CONTACT_NAME']);
+                            $sheet->setCellValue('C' . $excelRowNumber, $valueContact['CONTACT_PHONE']);
+                            $sheet->setCellValue('D' . $excelRowNumber, $valueContact['BILL_DATE']);
+                            $sheet->setCellValue('E' . $excelRowNumber, $valueContact['DUE_DATE']);
+                            $sheet->setCellValue('F' . $excelRowNumber, $valueContact['NOMINAL']);
+                            $sheet->setCellValue('G' . $excelRowNumber, $valueContact['TOTAL_CALLS']);
+                            $sheet->setCellValue('H' . $excelRowNumber, $valueContact['CALL_DATE']);
+                            $sheet->setCellValue('I' . $excelRowNumber, $valueContact['CALL_RESPONSE']);
+                            $excelRowNumber++;
+                        }
                     }
+
                 })->download('xlsx');
             }
         }
@@ -657,6 +662,14 @@ class CampaignController extends Controller
         $existingContacts = [];
         $tempContact = [];
 
+        $sip = DB::connection('sip')
+                ->table('sip')
+                ->selectRaw('DISTINCT(id) as extension, data as callerid')
+                ->where('keyword', 'callerid')
+                ->where('id', 'like', env('SIP_PREFIX_EXT').'%')
+                ->orderBy(DB::raw('RAND()'))
+                ->get();
+
         foreach ($dataRows AS $keyDataRows => $valueDataRows) {
             $tempContact['campaign_id'] = $campaignId;
             $tempContact['account_id'] = $valueDataRows->account_id;
@@ -665,6 +678,11 @@ class CampaignController extends Controller
             $tempContact['bill_date'] = $valueDataRows->bill_date;
             $tempContact['due_date'] = $valueDataRows->due_date;
             $tempContact['nominal'] = $valueDataRows->nominal;
+
+            $rand = rand(0,($sip->count()-1));
+            $tempContact['extension']   = $sip[$rand]->extension;
+            $tempContact['callerid']    = $sip[$rand]->callerid;
+            $tempContact['voice']       = Helpers::generateVoice(['bill_date'=>$valueDataRows->bill_date, 'due_date'=>$valueDataRows->due_date, 'nominal'=>$valueDataRows->nominal]);
 
             $isExists = Contact::where('campaign_id', '=', $tempContact['campaign_id'])
                 ->where('account_id', '=', trim($tempContact['account_id']))

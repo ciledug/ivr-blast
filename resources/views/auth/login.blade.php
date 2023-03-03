@@ -58,8 +58,8 @@
                                     </div>
                                     -->
                     
-                                    <div class="col-12">
-                                        <button type="submit" id="btn-login-submit" class="btn btn-primary w-100">Login</button>
+                                    <div class="col-12 mt-5">
+                                        <button type="submit" id="btn-login-submit" class="btn btn-primary w-100 btn-lg">Login</button>
                                     </div>
                                 </form>
                             </div>
