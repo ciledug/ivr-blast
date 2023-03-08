@@ -4,15 +4,6 @@
 <main id="main" class="main">
   <div class="pagetitle">
     <h1>Campaigns</h1>
-    <!--
-    <nav>
-      <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="index.html">Home</a></li>
-        <li class="breadcrumb-item">Tables</li>
-        <li class="breadcrumb-item active">General</li>
-      </ol>
-    </nav>
-    -->
   </div>
 
   <section class="section">
@@ -22,7 +13,7 @@
         <div class="card">
           <div class="card-body">
             <h5 class="card-title">
-              <a href="{{ route('campaign.create') }}" id="btn-add-campaign" class="btn btn-primary">
+              <a href="{{ route('campaigns.create') }}" id="btn-add-campaign" class="btn btn-primary">
                 Add Campaign
               </a>
             </h5>
@@ -30,52 +21,69 @@
             <table id="table-campaign-list-container" class="table table-hover">
               <thead>
                 <tr>
-                  <th scope="col">#</th>
-                  <th scope="col">Date Created</th>
+                  <th scope="col" width="40px">#</th>
+                  <th scope="col" width="160px">Date Created</th>
                   <th scope="col">Name</th>
-                  <th scope="col">Total Data</th>
+                  <th scope="col" width="100px">Total Data</th>
                   <th scope="col">Status</th>
                   <th scope="col">Created By</th>
-                  <th scope="col">Action</th>
+                  <th scope="col" width="250px">Action</th>
                 </tr>
               </thead>
-
+              
               <tbody>
-                @foreach ($campaigns AS $keyCampaign => $valueCampaign)
-                <tr>
-                  <td>{{ $loop->index + 1 }}.</td>
-                  <td>{{ $valueCampaign->created }}</td>
-                  <td>{{ $valueCampaign->name }}</td>
-                  <td class="text-end">{{ number_format($valueCampaign->total_data, 0, ',', '.') }}</td>
-                  <td>{{ ucwords($valueCampaign->status) }}</td>
-                  <td>{{ $valueCampaign->created_by }}</td>
-                  <td>
-                    @if ($valueCampaign->status === 'ready')
-                    <button type="button" class="btn btn-sm btn-success btn-start-stop" data-key="_{{ $valueCampaign->unique_key}}" onclick="startStopCampaign('{{ $valueCampaign->unique_key }}', '{{ $valueCampaign->status }}')">Start</button>
-                    @elseif ($valueCampaign->status === 'running')
-                    <button type="button" class="btn btn-sm btn-danger btn-start-stop" data-key="_{{ $valueCampaign->unique_key}}" onclick="startStopCampaign('{{ $valueCampaign->unique_key }}', '{{ $valueCampaign->status }}')">Paused</button>
-                    @elseif ($valueCampaign->status === 'paused')
-                    <button type="button" class="btn btn-sm btn-success btn-start-stop" data-key="_{{ $valueCampaign->unique_key}}" onclick="startStopCampaign('{{ $valueCampaign->unique_key }}', '{{ $valueCampaign->status }}')">Resume</button>
-                    @elseif ($valueCampaign->status === 'finished')
-                    <button type="button" class="btn btn-sm btn-success disabled">Start</button>
-                    @endif
+                @if($campaigns->count() > 0)
+                  @foreach ($campaigns AS $keyCampaign => $valueCampaign)
+                  <tr>
+                    <td>{{ $row_number++ }}.</td>
+                    <td>{{ $valueCampaign->created_at }}</td>
+                    <td>{{ $valueCampaign->name }}</td>
+                    <td class="text-end">{{ number_format($valueCampaign->total_data, 0, ',', '.') }}</td>
+                    <td>
+                      @php
+                          switch($valueCampaign->status) {
+                            default: break;
+                            case 0: echo 'Ready'; break;
+                            case 1: echo 'Running'; break;
+                            case 2: echo 'Paused'; break;
+                            case 3: echo 'Finished'; break;
+                          }
+                      @endphp
+                    </td>
+                    <td>{{ $valueCampaign->created_by }}</td>
+                    <td>
+                      @if ($valueCampaign->status != 3)
+                        @if ($valueCampaign->status == 0)
+                        <button type="button" class="btn btn-sm btn-success btn-start-stop" data-key="{{ $valueCampaign->id}}" onclick="startStopCampaign('{{ $valueCampaign->id }}', '{{ $valueCampaign->status }}')">Start</button>
+                        @elseif ($valueCampaign->status == 1)
+                        <button type="button" class="btn btn-sm btn-danger btn-start-stop" data-key="{{ $valueCampaign->id}}" onclick="startStopCampaign('{{ $valueCampaign->id }}', '{{ $valueCampaign->status }}')">Paused</button>
+                        @elseif ($valueCampaign->status == 2)
+                        <button type="button" class="btn btn-sm btn-success btn-start-stop" data-key="{{ $valueCampaign->id}}" onclick="startStopCampaign('{{ $valueCampaign->id }}', '{{ $valueCampaign->status }}')">Resume</button>
+                        @endif
+                      @endif
 
-                    <a href="{{ route('campaign.show') }}/_{{ $valueCampaign->unique_key }}" class="btn btn-sm btn-info btn-modal-spinner">Detail</a>
+                      <a href="{{ route('campaigns.show', ['id' => $valueCampaign->id]) }}" class="btn btn-sm btn-info btn-modal-spinner">Detail</a>
 
-                    @if (($valueCampaign->total_call_dialed > 0) || ($valueCampaign->status !== 'ready'))
-                    <!-- <a href="#" class="btn btn-sm btn-warning-outline disabled">Edit</a> -->
-                    @else
-                    <a href="{{ route('campaign.edit') }}/_{{ $valueCampaign->unique_key }}" class="btn btn-sm btn-warning btn-modal-spinner">Edit</a>
-                    @endif
-                    
-                    @if (($valueCampaign->total_call_dialed > 0) || ($valueCampaign->status !== 'ready'))
-                    <!-- <a href="{{ route('campaign.delete') }}/_{{ $valueCampaign->unique_key }}" class="btn btn-sm btn-outline-danger disabled">Delete</a> -->
-                    @else
-                    <a href="{{ route('campaign.delete') }}/_{{ $valueCampaign->unique_key }}" class="btn btn-sm btn-danger btn-modal-spinner">Delete</a>
-                    @endif
-                  </td>
-                </tr>
-                @endforeach
+                      @if ($valueCampaign->status != 3)
+                        @if ($valueCampaign->dialed_contacts == 0)
+                          <a href="{{ route('campaigns.edit', ['id' => $valueCampaign->id]) }}" class="btn btn-sm btn-warning btn-modal-spinner">Edit</a>
+                        @endif
+                      @endif
+
+
+                      @if ($valueCampaign->status != 3)
+                        @if ($valueCampaign->dialed_contacts == 0)
+                          <a href="{{ route('campaigns.delete', ['id' => $valueCampaign->id]) }}" class="btn btn-sm btn-danger btn-modal-spinner">Delete</a>
+                        @endif
+                      @endif
+                    </td>
+                  </tr>
+                  @endforeach
+                @else
+                  <tr>
+                    <td colspan="7" class="text-center">There's no campaign data</td>
+                  </tr>
+                @endif  
               </tbody>
             </table>
 
@@ -91,11 +99,7 @@
 
 @push('javascript')
 <script type="text/javascript">
-// var campaignListContainer = '';
-// var campaignList = [];
-
   $(document).ready(function() {
-    // prepareCampaignListTable();
     $('.btn-modal-spinner').click(function(e) {
       $('#modal-spinner').modal('show');
     });
@@ -104,7 +108,7 @@
   function startStopCampaign(campaignKey, currentStatus) {
     $.ajax({
       method: 'PUT',
-      url: '{{ route('campaign.update.startstop') }}',
+      url: '{{ route('campaigns.update.startstop') }}',
       headers: {
         'X-CSRF-TOKEN': '{{ csrf_token() }}'
       },
@@ -118,7 +122,6 @@
       contentType: 'application/json',
       cache: false,
       success: function(response) {
-        // campaignListContainer.ajax.reload();
         location.reload();
       },
       error: function(error) {
@@ -128,78 +131,6 @@
     .always(function() {
     });
   };
-
-  /*
-  function prepareCampaignListTable() {
-    campaignListContainer = $('#table-campaign-list-container').DataTable({
-      processing: true,
-      lengthMenu: [5, 10, 15, 20, 50, 100],
-      pageLength: 10,
-      responsive: true,
-      serverSide: true,
-      ajax: {
-        url: '{{ route('campaign.list.ajax') }}',
-        type: 'POST',
-        headers: {
-          'X-CSRF-TOKEN': '{{ csrf_token() }}'
-        }
-      },
-      columns: [
-        { data: null },
-        { data: 'created' },
-        { data: 'name' },
-        { data: 'total' },
-        { data: 'status' },
-        { data: 'created_by' }
-      ],
-      columnDefs: [
-        {
-          targets: 0,
-          orderable: false,
-          render: function(data, type, row, meta) {
-            return ++meta.row + '.';
-          }
-        },
-        {
-          targets: 3,
-          className: 'dt-body-right'
-        },
-        {
-          targets: 6,
-          data: null,
-          render: function(data, type, row, meta) {
-            campaignList['_' + row.key] = row;
-
-            var tempContent = '';
-            var titleStartStop = 'Start';
-            var btnStartStopCss = ' btn-success';
-            var btnEditCss = ' btn-warning';
-            var btnDeleteCss = ' btn-danger';
-            var rowStatus = row.status.toLowerCase();
-
-            switch (rowStatus) {
-              case 'running': titleStartStop = 'Pause'; btnStartStopCss = ' btn-danger'; btnEditCss = ' btn-outline-warning disabled'; btnDeleteCss = ' btn-outline-danger disabled'; break;
-              case 'paused': titleStartStop = 'Resume'; btnDeleteCss = ' btn-outline-danger disabled'; break;
-              case 'finished': btnStartStopCss += ' btn-outline-success disabled'; btnEditCss = ' btn-outline-warning disabled'; btnDeleteCss = ' btn-outline-danger disabled'; break;
-              case 'ready':
-              default: break;
-            }
-
-            tempContent += '<button type="button" class="btn btn-sm' + btnStartStopCss + ' btn-start-stop" data-key="_' + row.key + '" onclick="startStopCampaign(\'' + row.key + '\', \'' + rowStatus + '\')">' + titleStartStop + '</button>';
-            tempContent += '&nbsp;<a href="{{ route('campaign.show') }}/_' + row.key + '" class="btn btn-sm btn-info">Detail</a>';
-
-            if (row.progress <= 0) {
-              tempContent += '&nbsp;<a href="{{ route('campaign.edit') }}/_' + row.key + '" class="btn btn-sm' + btnEditCss + '">Edit</a>';
-            }
-            
-            tempContent += '&nbsp;<a href="{{ route('campaign.delete') }}/_' + row.key + '" class="btn btn-sm' + btnDeleteCss + '">Delete</a>';
-            return tempContent;
-          }
-        },
-      ]
-    });
-  };
-  */
 </script>
 @endpush
 

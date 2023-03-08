@@ -9,7 +9,9 @@
         "anouar/fpdf": "^2.0",
         "barryvdh/laravel-dompdf": "^0.8.2",
         "laravel/framework": "5.4.*",
+        "laravel/passport": "~4.0",
         "laravel/tinker": "~1.0",
+        "lcobucci/jwt": "3.3.3",
         "maatwebsite/excel": "^2.1"
     },
     "require-dev": {

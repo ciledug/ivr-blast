@@ -12,6 +12,8 @@ class CampaignSeeder extends Seeder
      */
     public function run()
     {
+        DB::table('campaigns')->truncate();
+
         $campaignNames = [
             'First Campaign',
             'Second Campaign',
@@ -26,6 +28,7 @@ class CampaignSeeder extends Seeder
                 ->insert([
                     'unique_key' => $today->getTimestamp(),
                     'name' => $valueCampaignValue,
+                    'status' => 1,
                     'created_by' => 1,
                     'created_at' => $today->format('Y-m-d H:i:s'),
                     'updated_at' => $today->format('Y-m-d H:i:s')

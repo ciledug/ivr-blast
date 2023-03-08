@@ -21,7 +21,7 @@
 
         @if (!session('saved_contacts'))
         <div class="card">
-          <form id="form-create-campaign" class="g-3 needs-validation" method="POST" action="{{ route('campaign.store') }}" enctype="multipart/form-data">
+          <form id="form-create-campaign" class="g-3 needs-validation" method="POST" action="{{ url('campaigns') }}" enctype="multipart/form-data">
             <div class="card-body">
               <h5 class="card-title">
                   Add Campaign
@@ -38,7 +38,7 @@
                 <div class="form-floating">
                   <div class="input-group">
                     <input class="form-control" type="file" id="input-campaign-excel-file" accept=".xls, .xlsx" required>
-                    <a href="{{ route('campaign.template') }}" class="btn btn-success" type="button">
+                    <a href="{{ url('campaigns/template') }}" class="btn btn-success" type="button">
                       <i class="bi bi-download"></i>
                       &nbsp; Contact Template
                     </a>
@@ -84,7 +84,6 @@
             <div class="alert alert-danger alert-dismissible fade show" role="alert">
               <h4 class="alert-heading">Data Input Error</h4>
               <p>Some contact data can not be saved. Please check the 'Failed Uploaded Contacts' table below to see them.</p>
-              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
 
             <div class="col-md-12 mt-4">
@@ -122,7 +121,7 @@
             </div>
 
             <div class="col-md-12 mt-3">
-              <a href="{{ route('campaign') }}" class="btn btn-secondary">Close</a>
+              <a href="{{ url('campaigns') }}" class="btn btn-secondary">Close</a>
             </div>
           </div>
         </div>
@@ -156,13 +155,13 @@
                   @foreach($failedContacts AS $failedContact)
                   <tr>
                     {{-- <th scope="col">#</td> --}}
-                    <td scope="col">{{ $failedContact->account_id }}</td>
-                    <td scope="col">{{ $failedContact->name }}</td>
-                    <td scope="col">{{ $failedContact->phone }}</td>
-                    <td scope="col">{{ $failedContact->bill_date }}</td>
-                    <td scope="col">{{ $failedContact->due_date }}</td>
-                    <td scope="col">{{ $failedContact->nominal }}</td>
-                    <td scope="col">{{ $failedContact->failed }}</td>
+                    <td>{{ $failedContact->account_id }}</td>
+                    <td>{{ $failedContact->name }}</td>
+                    <td>{{ $failedContact->phone }}</td>
+                    <td>{{ $failedContact->bill_date }}</td>
+                    <td>{{ $failedContact->due_date }}</td>
+                    <td class="text-end">{{ $failedContact->nominal }}</td>
+                    <td class="text-danger">{{ $failedContact->failed }}</td>
                   </tr>
                   @endforeach
                 </tbody>
@@ -170,8 +169,8 @@
             </div>
 
             <div class="col-md-12 mt-3">
-              <form id="form-campaign-export" class="g-3 needs-validation" method="POST" target="_blank" action="{{ route('campaign.export.failed') }}" enctype="multipart/form-data">
-                <a href="{{ route('campaign') }}" class="btn btn-secondary">Close</a>
+              <form id="form-campaign-export" class="g-3 needs-validation" method="POST" target="_blank" action="{{ url('campaigns/export/failed') }}" enctype="multipart/form-data">
+                <a href="{{ url('campaigns') }}" class="btn btn-secondary">Close</a>
                 <button type="submit" class="btn btn-success btn-export-as" id="btn-export-excel" data-export-as="excel">Export Excel</button>
                 {{ csrf_field() }}
                 <input type="hidden" name="input_key" value="{{ session('key') }}">
@@ -183,70 +182,13 @@
         </div>
         @endif
 
-        <div class="card-body">
-          <h5 class="card-title">Table with stripped rows</h5>
-
-          <!-- Table with stripped rows -->
-          <!--
-          <table class="table table-striped table-hover">
-            <thead>
-              <tr>
-                <th scope="col">#</th>
-                <th scope="col">Name</th>
-                <th scope="col">Position</th>
-                <th scope="col">Age</th>
-                <th scope="col">Start Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <th scope="row">1</th>
-                <td>Brandon Jacob</td>
-                <td>Designer</td>
-                <td>28</td>
-                <td>2016-05-25</td>
-              </tr>
-              <tr>
-                <th scope="row">2</th>
-                <td>Bridie Kessler</td>
-                <td>Developer</td>
-                <td>35</td>
-                <td>2014-12-05</td>
-              </tr>
-              <tr>
-                <th scope="row">3</th>
-                <td>Ashleigh Langosh</td>
-                <td>Finance</td>
-                <td>45</td>
-                <td>2011-08-12</td>
-              </tr>
-              <tr>
-                <th scope="row">4</th>
-                <td>Angus Grady</td>
-                <td>HR</td>
-                <td>34</td>
-                <td>2012-06-11</td>
-              </tr>
-              <tr>
-                <th scope="row">5</th>
-                <td>Raheem Lehner</td>
-                <td>Dynamic Division Officer</td>
-                <td>47</td>
-                <td>2011-04-19</td>
-              </tr>
-            </tbody>
-          </table>
-          -->
-          <!-- End Table with stripped rows -->
-
-        </div>
-
       </div>
     </div>
   </section>
 </main>
 
 @push('javascript')
+<script src="{{ url('js/xlsx.full.min.js') }}"></script>
 <script type="text/javascript">
 var previewContactDataContainer = '';
 var savedContactDataContainer = '';
@@ -265,6 +207,7 @@ var failedContactDataContainer = '';
     $('#input-campaign-excel-file').on("change", function(e) {
       handleFileAsync(e);
     });
+    
     $('.btn-back').click(function(e) {
       history.back();
     });

@@ -1,5 +1,5 @@
 <?php
-
+use App\Campaign;
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -20,57 +20,54 @@ Route::group(
     function() {
         // Route::get('/home', 'HomeController@index')->name('home');
         Route::get('/dashboard', "DashboardController@index")->name('dashboard');
+        Route::get('/dashboard/stream', 'DashboardController@stream')->name('dashboard.stream');
 
-        Route::prefix('campaign')->group(function() {
-            Route::get('/', "CampaignController@index")->name('campaign');
-            Route::get('create', "CampaignController@create")->name('campaign.create');
-            Route::get('show/{campaign?}', "CampaignController@show")->name('campaign.show');
-            Route::get('edit/{campaign?}', "CampaignController@edit")->name('campaign.edit');
-            Route::get('delete/{campaign?}', "CampaignController@delete")->name('campaign.delete');
-            Route::get('template', "CampaignController@downloadTemplate")->name('campaign.template');
-    
-            // Route::get('list', 'CampaignController@getCampaignList')->name('campaign.list');
-            Route::post('list/ajax', 'CampaignController@getCampaignListAjax')->name('campaign.list.ajax');
-            Route::post('/', 'CampaignController@store')->name('campaign.store');
-            Route::put('/', 'CampaignController@update')->name('campaign.update');
-            Route::put('startstop', 'CampaignController@updateStartStop')->name('campaign.update.startstop');
-            Route::delete('/', 'CampaignController@destroy')->name('campaign.destroy');
-    
-            Route::post('export', 'CampaignController@exportData')->name('campaign.export');
-            Route::post('export/failed', 'CampaignController@exportFailedContacts')->name('campaign.export.failed');
+        Route::prefix('campaigns')->group(function() {
+            Route::get('/', "CampaignController@index")->name('campaigns');
+            Route::get('create', "CampaignController@create")->name('campaigns.create');
+            Route::get('template', "CampaignController@downloadTemplate")->name('campaigns.template');
+            Route::get('{id}', "CampaignController@show")->name('campaigns.show');
+            Route::get('{id}/edit', "CampaignController@edit")->name('campaigns.edit');
+            Route::get('{id}/delete', "CampaignController@delete")->name('campaigns.delete');
+            
+            Route::post('/', 'CampaignController@store')->name('campaigns.store');
+            Route::post('export', 'CampaignController@exportData')->name('campaigns.export');
+            Route::post('export/failed', 'CampaignController@exportFailedContacts')->name('campaigns.export.failed');
+
+            Route::put('/', 'CampaignController@update')->name('campaigns.update');
+            Route::put('startstop', 'CampaignController@updateStartStop')->name('campaigns.update.startstop');
+
+            Route::delete('/', 'CampaignController@destroy')->name('campaigns.destroy');
+        });
+
+        Route::prefix('calllogs')->group(function() {
+            Route::get('/', 'CallLogController@index')->name('calllogs');
+            Route::get('/recording', 'CallLogController@recording')->name('calllogs.recording');
+            Route::post('export', 'CallLogController@exportData')->name('calllogs.export');
         });
         
-        Route::prefix('user')->group(function() {
-            Route::get('/', "UserController@index")->name('user');
-            Route::get('create', "UserController@create")->name('user.create');
-            Route::get('edit/{username?}', "UserController@edit")->name('user.edit');
-            Route::get('resetpass/{username?}', "UserController@showResetPassword")->name('user.resetpass');
-            Route::get('delete/{username?}', "UserController@delete")->name('user.delete');
-    
-            // Route::get('list', 'UserController@getUserList')->name('user.list');
-            Route::post('list', 'UserController@getUserListAjax')->name('user.list.ajax');
-            Route::post('/', 'UserController@store')->name('user.store');
-            Route::put('/', 'UserController@update')->name('user.update');
-            Route::put('resetpass', 'UserController@updatePassword')->name('user.update.password');
-            Route::delete('/{username?}', 'UserController@destroy')->name('user.destroy');
+        Route::prefix('users')->group(function() {
+            Route::get('/', "UserController@index")->name('users');
+            Route::get('{id}/edit', "UserController@edit")->name('users.edit');
+            Route::get('{id}/delete', "UserController@delete")->name('users.delete');
+            Route::get('{id}/resetpass', "UserController@showResetPassword")->name('users.resetpass');
+            Route::get('create', "UserController@create")->name('users.create');
+            
+            Route::put('/', 'UserController@update')->name('users.update');
+            Route::put('resetpass', 'UserController@updatePassword')->name('users.update.password');
+
+            Route::post('/', 'UserController@store')->name('users.store');
+            Route::delete('/', 'UserController@destroy')->name('users.destroy');
         });
-        
+
         Route::prefix('account')->group(function() {
             Route::get('/', "AccountController@index")->name('account');
             Route::put('/', 'AccountController@update')->name('account.update');
             Route::put('password', 'AccountController@updatePassword')->name('account.update.password');
         });
-        
-        Route::prefix('contact')->group(function() {
-            Route::get('show/{contact?}/{campaign?}', 'ContactController@show')->name('contact.show');
-            Route::get('list/{campaign?}', 'ContactController@contactList')->name('contact.list');
-            Route::post('list', 'ContactController@contactListAjax')->name('contact.list.ajax');
-        });
-        
-        Route::prefix('calllog')->group(function() {
-            Route::get('/{campaign?}', 'CallLogController@index')->name('calllogs');
-            Route::get('/{startDate?}/{endDate?}', 'CallLogController@getCallStatus')->name('callog.status');
-            Route::post('export', 'CallLogController@exportData')->name('calllog.export');
+
+        Route::prefix('contacts')->group(function() {
+            Route::get('{id}', 'ContactController@show')->name('contacts.show');
         });
     }
 );

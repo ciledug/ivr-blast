@@ -21,30 +21,12 @@ class ContactController extends Controller
     {
     }
 
-    public function show(Request $request, $contact=null, $campaign=null)
+    public function show(Request $request, $id)
     {
-        $data = array(
-            'contact' => array()
-        );
+        $contact = Contact::find($id);
+        $dataLogs = CallLog::where('contact_id', $contact->id)->orderBy('id', 'ASC')->get();
 
-        $contact = Contact::select([
-                'contacts.id', 'contacts.account_id', 'contacts.name', 'contacts.phone', 'contacts.bill_date', 'contacts.due_date', 'contacts.total_calls', 'contacts.nominal',
-                'call_logs.call_dial', 'call_logs.call_connect', 'call_logs.call_disconnect', 'call_logs.call_duration', 'call_logs.call_response'
-            ])
-            ->leftJoin('call_logs', 'call_logs.contact_id', '=', 'contacts.id')
-            ->where('contacts.campaign_id', '=', $campaign)
-            ->where('contacts.account_id', '=', Str::replaceFirst('_', '', $contact))
-            ->orderBy('call_logs.id', 'DESC')
-            ->first();
-
-        if ($contact) {
-            $contact->nominal = number_format($contact->nominal, 0, ',', '.');
-            $contact->call_response = $contact->call_response ? ucwords($contact->call_response) : '-';
-            $data['contact'] = $contact;
-        }
-        
-        // dd($data);
-        return view('contact.show', $data);
+        return view('contact.show', compact('contact', 'dataLogs'));
     }
 
     public function contactList(Request $request, $campaign) {

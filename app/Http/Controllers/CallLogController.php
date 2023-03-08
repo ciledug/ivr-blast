@@ -19,97 +19,142 @@ use Validator;
 
 class CallLogController extends Controller
 {
-    private $ITEMS_PER_PAGE = 15;
-
     public function __construct()
     {
-        // $this->middleware('auth');
+        $this->middleware('auth');
     }
 
-    public function index($campaign=null)
+    public function index(Request $request)
     {
         $campaigns = Campaign::select('id', 'unique_key', 'name')->get();
         $campaignMaxId = Campaign::select('id')->orderBy('id', 'DESC')->first();
         $callLogs = array();
 
-        $validator = Validator::make(['campaign' => $campaign], [
+        $validator = Validator::make(['campaign' => $request->campaign], [
             'campaign' => 'nullable|numeric|min:1|max:' . $campaignMaxId->id
         ]);
         if ($validator->fails()) return back();
 
         $callLogs = CallLog::select(
-            'contacts.id AS contact_id', 'contacts.name',
+            'contacts.id AS contact_id', 'contacts.account_id', 'contacts.phone',
                 'call_logs.call_dial', 'call_logs.call_connect', 'call_logs.call_disconnect', 'call_logs.call_duration', 'call_logs.call_response', 'call_logs.call_recording'
             )
             ->leftJoin('contacts', 'call_logs.contact_id', '=', 'contacts.id')
             ->orderBy('call_logs.id', 'DESC');
 
-        if ($campaign) {
-            $callLogs->where('contacts.campaign_id', '=', $campaign);
+        if ($request->campaign) {
+            $callLogs->where('contacts.campaign_id', '=', $request->campaign);
         }
 
-        $callLogs = $callLogs->paginate($this->ITEMS_PER_PAGE);
+        $startdate  = $request->startdate ? $request->startdate : null;
+        $enddate    = $request->enddate ? $request->enddate : null;
+
+        if($startdate){
+            $f_startdate = date('Y-m-d', strtotime(str_replace('/', '-', $startdate)));
+            $f_enddate = date('Y-m-d', strtotime(str_replace('/', '-', $enddate)));
+
+            $callLogs->whereRaw('DATE(call_logs.call_dial) BETWEEN ? AND ?', [$f_startdate, $f_enddate]);
+        }
+
+        $callLogs = $callLogs->paginate(15);
 
         return view('calllogs.index', array(
             'campaigns' => $campaigns,
-            'selectedCampaign' => (int) $campaign,
+            'selectedCampaign' => (int) $request->campaign,
             'calllogs' => $callLogs,
+            'startdate' =>$startdate,
+            'enddate' => $enddate
         ));
     }
 
-    public function getCallStatus(Request $request, $sentStartDate=null, $sentEndDate=null) {
-        $startDate = Carbon::now('Asia/Jakarta');
-        $endDate = Carbon::now('Asia/Jakarta');
-        $returnedCode = 500;
+    public function exportData(Request $request)
+    {
+        $input = $request->all();
 
-        $queryCallLog = CallLog::distinct()->orderBy('call_response', 'ASC')->get(['call_response']);
+        $validator = Validator::make($input, [
+            'export_startdate'=>'sometimes|required',
+            'export_enddate'=>'sometimes|required',
+        ]);
 
-        if ($queryCallLog) {
-            // dd($queryCallLog->toArray());
-
-            if ($sentStartDate != null) {
-                $startDate = Carbon::parse($sentStartDate, 'Asia/Jakarta');
-                if (!$startDate) {
-                    $startDate = Carbon::now('Asia/Jakarta');
-                }
-            }
-    
-            if ($sentEndDate != null) {
-                $endDate = Carbon::parse($sentEndDate, 'Asia/Jakarta');
-                if (!$endDate) {
-                    $endDate = Carbon::now('Asia/Jakarta');
-                }
-            }
-    
-            $startDate = $startDate->format('Y-m-d') . ' 00:00:00';
-            $endDate = $endDate->format('Y-m-d') . ' 23:59:59';
-            // echo 'startDate: ' . $startDate . ' endDate: ' . $endDate . ' ';
-            $startDate = '2023-01-23 00:00:00';
-            $endDate = '2023-01-24 23:59:59';
-
-            $tempResult = array();
-            foreach($queryCallLog->toArray() AS $keyResponseCode => $valueResponseCode) {
-                $query = CallLog::where('call_response', '=', $valueResponseCode['call_response'])
-                    ->whereBetween('created_at', [$startDate, $endDate])
-                    ->groupBy('contact_id')
-                    ->orderBy('created_at', 'DESC')
-                    ->get();
-                $tempResult[] = array(
-                    'cr_' . $valueResponseCode['call_response'] => $query->count()
-                );
-            }
-
-            $returnedCode = 200;
+        if ($validator->fails()) {
+            return back();
         }
-        
-        $returnedResponse = array(
-            'code' => $returnedCode,
-            'data' => $tempResult,
-        );
 
-        return response()->json($returnedResponse);
+        $campaign = null;
+        $query = CallLog::leftJoin('contacts','call_logs.contact_id','=','contacts.id')
+                        ->select('contacts.id AS contact_id', 'contacts.account_id', 'contacts.phone', 'call_logs.call_dial', 'call_logs.call_connect', 'call_logs.call_disconnect', 'call_logs.call_duration', 'call_logs.call_response', 'call_logs.call_recording');
+                        
+
+        if($request->export_startdate && $request->export_enddate){
+            $startdate = date('Y-m-d', strtotime(str_replace('/', '-', $request->export_startdate)));
+            $enddate = date('Y-m-d', strtotime(str_replace('/', '-', $request->export_enddate)));
+            $query = $query->whereRaw('DATE(call_logs.call_dial) BETWEEN ? AND ?', [$startdate, $enddate]);
+        }
+
+        if($request->export_campaign){
+            $query = $query->where('contacts.campaign_id', $request->export_campaign);
+            $campaign = Campaign::where('id', $request->export_campaign)->first();
+        }
+
+        $callLogs = $query->orderBy('call_logs.id','ASC')->get();
+
+        $filename = 'report-call-logs-'.time();
+       
+        // excel
+        Excel::load(storage_path('app/public/files/Report_Call_Logs.xlsx'), function($file) use($request, $campaign, $callLogs) {
+            $sheet = $file->setActiveSheetIndex(0);
+            $subtitle = null;
+            if($request->export_startdate && $request->export_enddate){
+                $subtitle .= 'Date Range : '.$request->export_startdate.' - '.$request->export_enddate;
+            }
+
+            if($request->export_campaign){
+                $subtitle .= $request->export_startdate ? ' | ': '';
+                $subtitle .= 'Campaign : '.$campaign->name;
+            }
+            
+            $sheet->setCellValue('A2', $subtitle);
+
+            $excelRowNumber = 5;
+            foreach ($callLogs->chunk(300) AS $rows) {
+                foreach($callLogs as $row){
+                    $sheet->setCellValue('A' . $excelRowNumber, date('d/m/Y', strtotime($row->call_dial)));
+                    $sheet->setCellValue('B' . $excelRowNumber, $row->account_id);
+                    $sheet->setCellValue('C' . $excelRowNumber, $row->phone);
+                    $sheet->setCellValue('D' . $excelRowNumber, date('H:i:s', strtotime($row->call_dial)));
+                    $sheet->setCellValue('E' . $excelRowNumber, $row->call_connect ? date('H:i:s', strtotime($row->call_connect)) : '');
+                    $sheet->setCellValue('F' . $excelRowNumber, $row->call_disconnect ? date('H:i:s', strtotime($row->call_disconnect)) : '');
+                    $sheet->setCellValue('G' . $excelRowNumber, $row->call_duration > 0 ? App\Helpers\Helpers::secondsToHms($row->call_duration) : '');
+                    $sheet->setCellValue('H' . $excelRowNumber, $row->call_response);
+                    $excelRowNumber++;
+                }
+            }
+
+        })->download('xlsx');
+
     }
 
+    public function recording(Request $request)
+    {
+        $audio = $request->audio;
+        
+        $checkpath  = '/var/spool/asterisk/monitor/'.$audio;            
+        if(file_exists($checkpath)){
+            $filepath = $checkpath;
+        }else{
+            $filepath = '/home/asterisk-recording/'.$audio;
+        }
+
+        header("Content-Transfer-Encoding: binary"); 
+        header("Content-Type: audio/wav");
+        header('Content-Disposition:: inline; filename="'.$audio.'"');
+        header('Content-length: '.filesize($filepath));
+        header('Cache-Control: no-cache');
+        header('Accept-Ranges: bytes');
+        readfile($filepath);
+    }
+
+    /*
     public function exportData(Request $request)
     {
         $validator = Validator::make($request->input(), [
@@ -248,4 +293,5 @@ class CallLogController extends Controller
             return back();
         }
     }
+    */
 }

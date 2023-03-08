@@ -24,7 +24,7 @@
                 Delete User for {{ $user->username }} ({{ $user->name }})
             </h5>
             
-            <form id="form-delete-user" class="row g-3 needs-validation" method="POST" action="{{ route('user.destroy') }}" enctype="multipart/form-data" novalidate>
+            <form id="form-delete-user" class="row g-3 needs-validation" method="POST" action="{{ route('users.destroy') }}" enctype="multipart/form-data" novalidate>
               {{ csrf_field() }}
 
               <div class="col-md-12">
@@ -54,7 +54,7 @@
                 &nbsp;<div id="submit-spinner" class="spinner-border spinner-border-sm text-primary" role="status">
                   <span class="visually-hidden">Loading...</span>
                 </div>
-                <input type="hidden" id="input-delete-user" name="user" value="_{{ $user->username or ''}}">
+                <input type="hidden" id="input-delete-user" name="user" value="{{ $user->id or ''}}">
                 <input type="hidden" name="_method" value="DELETE">
               </div>
             </form>

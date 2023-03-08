@@ -179,8 +179,10 @@ return [
         App\Providers\RouteServiceProvider::class,
 
         Anouar\Fpdf\FpdfServiceProvider::class,
+        Barryvdh\Debugbar\ServiceProvider::class,
         Barryvdh\DomPDF\ServiceProvider::class,
         Maatwebsite\Excel\ExcelServiceProvider::class,
+        Laravel\Passport\PassportServiceProvider::class,
     ],
 
     /*
@@ -231,6 +233,7 @@ return [
         'View' => Illuminate\Support\Facades\View::class,
 
         'Fpdf' => Anouar\Fpdf\Facades\Fpdf::class,
+        'Debugbar' => Barryvdh\Debugbar\Facades\Debugbar::class,
         'PDF' => Barryvdh\DomPDF\Facade::class,
         'Excel' => Maatwebsite\Excel\Facades\Excel::class,
 

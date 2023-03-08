@@ -22,22 +22,22 @@
         @if (!session('saved_contacts'))
         <div class="card">
           <div class="card-body">
-            <form id="form-update-campaign" class="g-3 needs-validation" method="POST" action="{{ route('campaign.update') }}" enctype="multipart/form-data">
+            <form id="form-update-campaign" class="g-3 needs-validation" method="POST" action="{{ url('campaigns') }}" enctype="multipart/form-data">
               <h5 class="card-title">
                   Edit Campaign
               </h5>
 
-              @if(session('already_running'))
+              {{-- @if (session('already_running')) --}}
+              @if ($campaign->dialed_contacts > 0)
               <div class="alert alert-danger alert-dismissible fade show" role="alert">
                 <h4 class="alert-heading">Campaign Already Running</h4>
                 <p>This campaign already running once so can not be edited or changed</p>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
               </div>
               @endif
 
               <div class="col-md-12">
                 <div class="form-floating">
-                  <input type="text" class="form-control" id="edit-campaign-name" name="name" minlength="4" maxlength="50" placeholder="Name" value="{{ $campaign->name or '' }}" required>
+                  <input type="text" class="form-control" id="edit-campaign-name" name="name" minlength="4" maxlength="50" placeholder="Name" value="{{ $campaign->name or '' }}" required @if ($campaign->dialed_contacts > 0) disabled @endif>
                   <label for="edit-campaign-name">Campaign Name</label>
                 </div>
               </div>
@@ -45,8 +45,8 @@
               <div class="col-md-12 mt-3">
                 <div class="row form-floating">
                   <div class="input-group">
-                    <input class="form-control" type="file" id="edit-campaign-excel-file" accept=".xls, .xlsx">
-                    <a href="{{ route('campaign.template') }}" class="btn btn-success" type="button">
+                    <input class="form-control" type="file" id="edit-campaign-excel-file" accept=".xls, .xlsx" @if ($campaign->dialed_contacts > 0) disabled @endif>
+                    <a href="{{ url('campaigns/template') }}" class="btn btn-success" type="button">
                       <i class="bi bi-download"></i>
                       &nbsp; Contact Template
                     </a>
@@ -74,7 +74,7 @@
                 <table class="table table-hover">
                   <thead>
                     <tr>
-                        {{-- <th scope="col">#</th> --}}
+                        <th scope="col">#</th>
                         <th scope="col">Account ID</th>
                         <th scope="col">Name</th>
                         <th scope="col">Phone</th>
@@ -87,6 +87,7 @@
                   <tbody>
                     @foreach ($contacts AS $keyData => $valueData)
                     <tr>
+                      <td class="text-end">{{ $row_number++ }}.</td>
                       <td>{{ $valueData->account_id }}</td>
                       <td>{{ $valueData->name }}</td>
                       <td>{{ $valueData->phone }}</td>
@@ -119,12 +120,14 @@
 
               <div class="col-md-12 mt-4">
                 <button type="button" class="btn btn-secondary btn-back">Cancel</button>
+                @if ($campaign->dialed_contacts == 0)
                 <button type="submit" class="btn btn-outline-primary disabled" id="btn-submit-edit-campaign">Save</button>
                 <input type="hidden" id="edit-new-campaign-rows" name="rows" value="">
-                <input type="hidden" id="edit-campaign-key" name="campaign" value="_{{ $campaign->unique_key }}">
+                <input type="hidden" id="edit-campaign-key" name="campaign" value="{{ $campaign->id }}">
                 <input type="hidden" id="edit-campaign-action" name="action" value="">
                 {{ csrf_field() }}
                 <input type="hidden" name="_method" value="PUT">
+                @endif
               </div>
             </form>
           </div>
@@ -139,7 +142,6 @@
             <div class="alert alert-danger alert-dismissible fade show" role="alert">
               <h4 class="alert-heading">Data Input Error</h4>
               <p>Some contact data can not be saved. Please check the 'Failed Contacts' table below to see them.</p>
-              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
 
             <div class="col-md-12 mt-4">
@@ -177,7 +179,7 @@
             </div>
 
             <div class="col-md-12 mt-3">
-              <a href="{{ route('campaign') }}" class="btn btn-secondary">Close</a>
+              <a href="{{ url('campaigns') }}" class="btn btn-secondary">Close</a>
             </div>
           </div>
         </div>
@@ -217,7 +219,7 @@
                     <td scope="col">{{ $failedContact->bill_date }}</td>
                     <td scope="col">{{ $failedContact->due_date }}</td>
                     <td scope="col">{{ $failedContact->nominal }}</td>
-                    <td scope="col">{{ $failedContact->failed }}</td>
+                    <td scope="col" class="text-danger">{{ $failedContact->failed }}</td>
                   </tr>
                   @endforeach
                 </tbody>
@@ -225,8 +227,8 @@
             </div>
 
             <div class="col-md-12 mt-3">
-              <form id="form-campaign-export" class="g-3 needs-validation" method="POST" target="_blank" action="{{ route('campaign.export.failed') }}" enctype="multipart/form-data">
-                <a href="{{ route('campaign') }}" class="btn btn-secondary">Close</a>
+              <form id="form-campaign-export" class="g-3 needs-validation" method="POST" target="_blank" action="{{ url('campaigns/export/failed') }}" enctype="multipart/form-data">
+                <a href="{{ url('campaigns') }}" class="btn btn-secondary">Close</a>
                 <button type="submit" class="btn btn-success btn-export-as" id="btn-export-excel" data-export-as="excel">Export Excel</button>
                 {{ csrf_field() }}
                 <input type="hidden" name="input_key" value="{{ session('key') }}">
@@ -244,6 +246,7 @@
 </main>
 
 @push('javascript')
+<script src="{{ url('js/xlsx.full.min.js') }}"></script>
 <script type="text/javascript">
 var previewContactDataContainer = '';
 var savedContactDataContainer = '';
@@ -348,31 +351,6 @@ var tempRows = [];
     $('.radio-campaign-edit-action').click(function(e) {
       $('#edit-campaign-action').val($(this).val());
       changeEditActionButtons();
-    });
-  };
-
-  function getContactList() {
-    $.ajax({
-      method: 'GET',
-      url: "{{ route('contact.list') }}/_{{ $campaign->unique_key}}",
-      headers: {
-        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-      },
-      processData: false,
-      contentType: false,
-      cache: false,
-      success: function(response) {
-        previousContactData = response.data;
-
-        previewContactDataContainer.clear();
-        previewContactDataContainer.rows.add(response.data);
-        previewContactDataContainer.draw();
-      },
-      error: function(error) {
-        console.log(error.responseText);
-      }
-    })
-    .always(function() {
     });
   };
 

@@ -2,7 +2,7 @@
     <ul class="sidebar-nav" id="sidebar-nav">
         <!-- dashboard -->
         <li class="nav-item">
-            @if (Route::currentRouteName() === 'dashboard')
+            @if (str_contains(Route::currentRouteName(), 'dashboard'))
             <a class="nav-link" href="{{ url('/dashboard') }}">
             @else
             <a class="nav-link collapsed" href="{{ url('/dashboard') }}">
@@ -14,19 +14,19 @@
     
         <!-- campaign -->
         <li class="nav-item">
-            @if (Route::currentRouteName() === 'campaign')
-            <a class="nav-link" href="{{ url('/campaign') }}">
+            @if (str_contains(Route::currentRouteName(), 'campaigns'))
+            <a class="nav-link" href="{{ url('/campaigns') }}">
             @else
-            <a class="nav-link collapsed" href="{{ url('/campaign') }}">
+            <a class="nav-link collapsed" href="{{ url('/campaigns') }}">
             @endif
                 <i class="bi bi-person"></i>
-                <span>Campaign</span>
+                <span>Campaigns</span>
             </a>
         </li>
 
         <!-- calllogs -->
         <li class="nav-item">
-            @if (Route::currentRouteName() === 'calllogs')
+            @if (str_contains(Route::currentRouteName(), 'calllogs'))
             <a class="nav-link" href="{{ route('calllogs') }}">
             @else
             <a class="nav-link collapsed" href="{{ route('calllogs') }}">
@@ -36,12 +36,12 @@
             </a>
         </li>
     
-        <!-- user -->
+        <!-- users -->
         <li class="nav-item">
-            @if (Route::currentRouteName() === 'user')
-            <a class="nav-link" href="{{ url('/user') }}">
+            @if (str_contains(Route::currentRouteName(), 'users'))
+            <a class="nav-link" href="{{ url('/users') }}">
             @else
-            <a class="nav-link collapsed" href="{{ url('/user') }}">
+            <a class="nav-link collapsed" href="{{ url('/users') }}">
             @endif
                 <i class="bi bi-person"></i>
                 <span>Users</span>
@@ -50,7 +50,7 @@
     
         <!-- account -->
         <li class="nav-item">
-            @if (Route::currentRouteName() === 'account')
+            @if (str_contains(Route::currentRouteName(), 'account'))
             <a class="nav-link" href="{{ url('/account') }}">
             @else
             <a class="nav-link collapsed" href="{{ url('/account') }}">

@@ -24,7 +24,7 @@
                 Add User
             </h5>
             
-            <form id="form-create-user" class="row g-3 needs-validation" method="POST" action="{{ route('user.store') }}" enctype="multipart/form-data" novalidate>
+            <form id="form-create-user" class="row g-3 needs-validation" method="POST" action="{{ route('users.store') }}" enctype="multipart/form-data" novalidate>
               {{ csrf_field() }}
 
               <div class="col-md-12">

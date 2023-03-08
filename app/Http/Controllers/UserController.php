@@ -20,8 +20,24 @@ class UserController extends Controller
     
     public function index()
     {
+        $users = User::select([
+                'users.id', 'name', 'username', 'email',
+            ])
+            ->selectRaw('
+                (SELECT u2.name FROM users u2 WHERE u2.id = users.added_by) AS added_by,
+                (SELECT user_logs.last_login FROM user_logs WHERE user_logs.user_id = users.id ORDER BY user_logs.id DESC LIMIT 1) AS last_login,
+                (SELECT user_logs.last_ip_address FROM user_logs WHERE user_logs.user_id = users.id ORDER BY user_logs.id DESC LIMIT 1) AS last_ip_address
+            ')
+            ->whereNotIn('users.id', [Auth::user()->id])
+            ->orderBy('users.name', 'ASC')
+            ->groupBy('users.id')
+            ->paginate(15);
+
+        $rowNumber = $users->firstItem();
+
         return view('user.index', [
-            'users' => $this->getUserList(),
+            'users' => $users,
+            'row_number' => $rowNumber,
         ]);
     }
 
@@ -30,34 +46,18 @@ class UserController extends Controller
         return view('user.create');
     }
 
-    public function edit(Request $request, $userName=null)
+    public function edit(Request $request, $id)
     {
-        $data = array();
-
-        $user = User::where('username' ,'=', Str::replaceFirst('_', '', $userName))
-            ->whereNull('deleted_at')
-            ->first();
-        
-        if ($user) {
-            $data['user'] = $user;
-        }
-
-        return view('user.edit', $data);
+        return view('user.edit', [
+            'user' => User::find($id)
+        ]);
     }
 
-    public function delete(Request $request, $userName)
+    public function delete(Request $request, $id)
     {
-        $data = array();
-
-        $user = User::where('username', Str::replaceFirst('_', '', $request->username))
-            ->whereNull('deleted_at')
-            ->first();
-
-        if ($user) {
-            $data['user'] = $user;
-        }
-
-        return view('user.delete', $data);
+        return view('user.delete', [
+            'user' => User::find($id),
+        ]);
     }
 
     public function store(Request $request)
@@ -81,7 +81,7 @@ class UserController extends Controller
             'added_by' => Auth::user()->id,
         ]);
 
-        return redirect()->route('user');
+        return redirect()->route('users');
     }
 
     public function update(Request $request)
@@ -90,16 +90,14 @@ class UserController extends Controller
             'name' => 'required|string|min:5|max:30',
             'username' => 'required|string|min:5|max:20',
             'email' => 'nullable|email|min:10|max:50',
-            'user' => 'required|string|min:5|max:20'
+            'user' => 'required|numeric'
         ]);
 
         if ($validator->fails()) {
             return back()->withErrors($validator)->withInput();
         }
         
-        $user = User::where('username', '=', Str::replaceFirst('_', '', $request->user))
-            ->whereNull('deleted_at')
-            ->first();
+        $user = User::find($request->user);
 
         if ($user) {
             if (strcmp($user->username, $request->username) != 0) {
@@ -136,7 +134,7 @@ class UserController extends Controller
             $user->name = $request->name;
             $user->save();
             
-            return redirect()->route('user');
+            return redirect()->route('users');
         }
         else {
             return back()->withInput();
@@ -145,99 +143,28 @@ class UserController extends Controller
 
     public function destroy(Request $request)
     {
-        $user = User::where('username', Str::replaceFirst('_', '', $request->user))
-            ->whereNull('deleted_at')
-            ->first();
+        $user = User::find($request->user);
 
         if ($user != null) {
             $user->delete();
-            return redirect()->route('user');
+            return redirect()->route('users');
         }
         else {
             return back();
         }
     }
 
-    public function getUserListAjax(Request $request)
+    public function showResetPassword($id)
     {
-        $ORDERED_COLUMNS = ['name', 'username', 'last_login', 'last_ip_address', 'added_by'];
-        $ORDERED_BY = ['desc', 'asc'];
-        $COLUMN_IDX = is_numeric($request->order[0]['column']) ? $request->order[0]['column'] : 0;
-        $START = is_numeric($request->start) ? $request->start : 0;
-        $LENGTH = is_numeric($request->length) ? $request->length : 10;
-        $SEARCH_VALUE = !empty($request->search['value']) ? $request->search['value'] : '';
-
-        $recordsTotalQuery = 0;
-        $userList = [];
-
-        $query = User::select(['name', 'username', 'email', 'added_by']);
-
-        if (!empty($SEARCH_VALUE)) {
-            $query->where(function($q) use($SEARCH_VALUE) {
-                $q->where('name', 'LIKE', '%' . $SEARCH_VALUE . '%')
-                    ->orWhere('username', 'LIKE', '%' . $SEARCH_VALUE . '%')
-                    ->orwhere('last_login', 'LIKE', '%' . $SEARCH_VALUE . '%')
-                    ->orwhere('last_ip_address', 'LIKE', '%' . $SEARCH_VALUE . '%')
-                    ->orwhere('added_by', 'LIKE', '%' . $SEARCH_VALUE . '%');
-            });
-        }
-
-        if (in_array($request->order[0]['dir'], $ORDERED_BY)) {
-            $query->orderBy($ORDERED_COLUMNS[$COLUMN_IDX], $request->order[0]['dir']);
-        }
-
-        $filteredData = $query->get();
-        $users = $query->offset($START)->limit($LENGTH)->get();
-
-        if ($users) {
-            if ($users->count() > 0) {
-                foreach ($users AS $keyUser => $valueUser) {
-                    $userLog = UserLog::select(['last_login', 'last_ip_address'])
-                        ->where('user_id', '=', $valueUser->id)
-                        ->orderBy('last_login', 'DESC')
-                        ->first();
-                    // dd($userLog);
-
-                    $userList[] = array(
-                        'name' => $valueUser->name,
-                        'username' => $valueUser->username,
-                        'email' => $valueUser->email,
-                        'added_by' => $valueUser->added_by,
-                        'last_login' => $userLog ? $userLog->last_login : '',
-                        'last_ip_address' => $userLog ? $userLog->last_ip_address : '',
-                    );
-                }
-            }
-        }
-
-        $returnedResponse = array(
-            'draw' => $request->draw,
-            'recordsTotal' => User::all()->count(),
-            'recordsFiltered' => $filteredData->count(),
-            'data' => $userList
-        );
-
-        return response()->json($returnedResponse);
-    }
-
-    public function showResetPassword(Request $request, $userName)
-    {
-        $data = array();
-        $user = User::where('username', '=', Str::replaceFirst('_', '', $userName))
-            ->whereNull('deleted_at')
-            ->first();
-
-        if ($user) {
-            $data['user'] = $user;
-        }
-
-        return view('user.reset_password', $data);
+        return view('user.reset_password', [
+            'user' => User::find($id),
+        ]);
     }
 
     public function updatePassword(Request $request)
     {
         $validator = Validator::make($request->input(), [
-            'user' => 'required|string|min:5|max:30',
+            'user' => 'required|numeric',
             'password' => 'required|string|min:6|max:15|confirmed',
         ]);
 
@@ -245,42 +172,15 @@ class UserController extends Controller
             return back()->withErrors($validator)->withInput();
         }
 
-        $user = User::where('username', '=', Str::replaceFirst('_', '', $request->user))
-            ->first();
+        $user = User::find($request->user);
 
         if ($user) {
             $user->password = Hash::make($request->password);
             $user->save();
-            return redirect()->route('user');
+            return redirect()->route('users');
         }
         else {
             return back()->withInput();
         }
-    }
-
-    private function getUserList()
-    {
-        $users = User::select(['id', 'name', 'username', 'email', 'added_by'])
-            ->orderBy('users.name', 'DESC')
-            ->paginate(15);
-
-        if ($users->count() > 0) {
-            foreach ($users AS $keyUser => $valueUser) {
-                $addedBy = User::select('name', 'username')
-                    ->where('id', '=', $valueUser->added_by)
-                    ->first();
-
-                $userLog = UserLog::select(['last_login', 'last_ip_address'])
-                    ->where('user_id', '=', $valueUser->id)
-                    ->orderBy('id', 'DESC')
-                    ->first();
-
-                $users[$keyUser]['added_by'] = $addedBy;
-                $users[$keyUser]['last_login'] = $userLog ? $userLog->last_login : '-';
-                $users[$keyUser]['last_ip_address'] = $userLog ? $userLog->last_ip_address : '-';
-            }
-        }
-
-        return $users;
     }
 }
