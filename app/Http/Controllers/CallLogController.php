@@ -11,7 +11,7 @@ use Carbon\Carbon;
 
 use App\CallLog;
 use App\Campaign;
-use App\Contact;
+use App\TemplateHeader;
 
 use App;
 use PDF;
@@ -24,6 +24,317 @@ class CallLogController extends Controller
         $this->middleware('auth');
     }
 
+    public function index(Request $request)
+    {
+        // dd($request->input());
+
+        $campaigns = Campaign::select('id', 'unique_key', 'name')->get();
+        $campaignMaxId = Campaign::max('id');
+        $callLogs = array();
+        $templateHeaders = [];
+
+        $validator = Validator::make($request->input(), [
+            'campaign' => 'nullable|numeric|min:1|max:' . $campaignMaxId,
+            'startdate' => 'nullable|date_format:d/m/Y',
+            'enddate' => 'nullable|date_format:d/m/Y',
+        ]);
+        if ($validator->fails()) return back();
+
+        $startdate  = $request->startdate ? $request->startdate : null;
+        $enddate    = $request->enddate ? $request->enddate : null;
+        $callLogs   = [];
+        $rowNumber = 0;
+
+        if (isset($request->campaign) && $request->campaign >= 1) {
+            $theCampaign = Campaign::select(
+                    'campaigns.id AS campaign_id', 'campaigns.template_id', 'campaigns.reference_table'
+                )
+                ->where('campaigns.id', $request->campaign)
+                ->whereNull('campaigns.deleted_at')
+                ->first();
+            // dd($theCampaign);
+
+            if ($theCampaign) {
+                $tableReference = $theCampaign->reference_table;
+                $tableReferenceCallLogs = $tableReference . '_call_logs';
+                $mandatoryColumns = [];
+
+                $templateHeaders = TemplateHeader::where('template_id', $theCampaign->template_id)
+                    ->whereNull('deleted_at')
+                    ->get();
+
+                foreach ($templateHeaders AS $keyHeader => $valHeader) {
+                    if ($valHeader->is_mandatory || ($valHeader->type === 'handphone')) {
+                        $mandatoryColumns[] = strtolower($tableReference . '.' . $valHeader->name);
+                    }
+                }
+                // dd($mandatoryColumns);
+
+                $callLogs = DB::table($tableReferenceCallLogs)
+                    ->select($tableReferenceCallLogs . '.*')
+                    ->selectRaw(implode(', ', $mandatoryColumns))
+                    ->leftJoin($tableReference, $tableReferenceCallLogs . '.contact_id', '=', $tableReference . '.id')
+                    ->orderBy($tableReferenceCallLogs . '.id', 'DESC');
+
+                if($startdate){
+                    $f_startdate = date('Y-m-d', strtotime(str_replace('/', '-', $startdate)));
+                    $f_enddate = date('Y-m-d', strtotime(str_replace('/', '-', $enddate)));
+                    $callLogs->whereRaw('DATE(' . $tableReferenceCallLogs . '.call_dial) BETWEEN ? AND ?', [$f_startdate, $f_enddate]);
+                }
+
+                // dd($callLogs->toSql());
+                $callLogs = $callLogs->paginate(15);
+                $callLogs->appends([
+                    '_token' => $request->_token,
+                    'startdate' => $request->startdate,
+                    'enddate' => $request->enddate,
+                    'campaign' => $request->campaign,
+                ]);
+                // dd($callLogs);
+
+                $rowNumber = $callLogs->firstItem();
+            }
+        }
+        // else {
+        // }
+        
+        return view('calllogs.index', array(
+            'row_number' => $rowNumber,
+            'campaigns' => $campaigns,
+            'selectedCampaign' => (int) $request->campaign,
+            'calllogs' => $callLogs,
+            'startdate' =>$startdate,
+            'enddate' => $enddate,
+            'template_headers' => $templateHeaders,
+        ));
+    }
+
+    public function exportData(Request $request)
+    {
+        $input = $request->all();
+
+        $validator = Validator::make($input, [
+            'export_campaign' => 'required|numeric|min:1|max:' . Campaign::max('id'),
+            'export_startdate'=>'sometimes|required',
+            'export_enddate'=>'sometimes|required',
+        ]);
+        if ($validator->fails()) {
+            return back();
+        }
+
+        $startdate  = $request->startdate ? $request->startdate : null;
+        $enddate    = $request->enddate ? $request->enddate : null;
+
+        $campaignCallLogs = $this->getCampaignCallLogs($request->export_campaign, $startdate, $enddate);
+        // dd($campaignCallLogs);
+        $filename = 'report-call-logs-'.time();
+       
+        // excel
+        Excel::load(storage_path('app/public/files/Report_Call_Logs.xlsx'), function($file) use($request, $campaignCallLogs) {
+            $sheet = $file->setActiveSheetIndex(0);
+            $subtitle = null;
+            if($request->export_startdate && $request->export_enddate){
+                $subtitle .= 'Date Range : '.$request->export_startdate.' - '.$request->export_enddate;
+            }
+
+            if($request->export_campaign){
+                $subtitle .= $request->export_startdate ? ' | ': '';
+                $subtitle .= 'Campaign : '.$campaignCallLogs['campaign']->name;
+            }
+            
+            $sheet->setCellValue('A2', $subtitle);
+
+            // ---
+            // --- column's title
+            // ---
+            if (count($campaignCallLogs['template_headers']) > 0) {
+                foreach($campaignCallLogs['template_headers'] AS $keyHeader => $valHeader) {
+                    $sheet->setCellValueByColumnAndRow($keyHeader, 4, strtoupper($valHeader->name));
+                }
+                
+                $headersCount = count($campaignCallLogs['template_headers']);
+                $sheet->setCellValueByColumnAndRow($headersCount++, 4, 'CALL_CONNECT');
+                $sheet->setCellValueByColumnAndRow($headersCount++, 4, 'CALL_DISCONNECT');
+                $sheet->setCellValueByColumnAndRow($headersCount++, 4, 'CALL_DURATION');
+                $sheet->setCellValueByColumnAndRow($headersCount++, 4, 'CALL_RESPONSE');
+            }
+
+            // ---
+            // --- populate values
+            // ---
+            $excelRowNumber = 5;
+            $columnName = '';
+            foreach ($campaignCallLogs['call_logs']->chunk(300) AS $rows) {
+                foreach($campaignCallLogs['call_logs'] as $row){
+                    foreach ($campaignCallLogs['template_headers'] AS $keyHeader => $valHeader) {
+                        $columnName = strtolower($valHeader->name);
+                        $sheet->setCellValueByColumnAndRow($keyHeader, $excelRowNumber, strtoupper($row->$columnName));
+                    }
+
+                    $headersCount = count($campaignCallLogs['template_headers']);
+                    $sheet->setCellValueByColumnAndRow($headersCount++, $excelRowNumber, $row->call_connect ? date('H:i:s', strtotime($row->call_connect)) : '');
+                    $sheet->setCellValueByColumnAndRow($headersCount++, $excelRowNumber, $row->call_disconnect ? date('H:i:s', strtotime($row->call_disconnect)) : '');
+                    $sheet->setCellValueByColumnAndRow($headersCount++, $excelRowNumber, $row->call_duration > 0 ? App\Helpers\Helpers::secondsToHms($row->call_duration) : '');
+                    $sheet->setCellValueByColumnAndRow($headersCount++, $excelRowNumber, $row->call_response);
+
+                    $excelRowNumber++;
+                }
+            }
+
+        })->download('xlsx');
+    }
+
+    public function recording(Request $request)
+    {
+        $audio = $request->audio;
+        
+        $checkpath  = '/var/spool/asterisk/monitor/'.$audio;            
+        if(file_exists($checkpath)){
+            $filepath = $checkpath;
+        }else{
+            $filepath = '/home/asterisk-recording/'.$audio;
+        }
+
+        header("Content-Transfer-Encoding: binary"); 
+        header("Content-Type: audio/wav");
+        header('Content-Disposition:: inline; filename="'.$audio.'"');
+        header('Content-length: '.filesize($filepath));
+        header('Cache-Control: no-cache');
+        header('Accept-Ranges: bytes');
+        readfile($filepath);
+    }
+
+    private function getCampaignCallLogs($cammpaignId, $startDate=null, $endDate=null)
+    {
+        $callLogs = [];
+        $templateHeaders = [];
+
+        $theCampaign = Campaign::select(
+                'campaigns.id AS campaign_id', 'campaigns.name', 'campaigns.template_id', 'campaigns.reference_table'
+            )
+            ->where('campaigns.id', $cammpaignId)
+            ->whereNull('campaigns.deleted_at')
+            ->first();
+        // dd($theCampaign);
+
+        if ($theCampaign) {
+            $tableReference = $theCampaign->reference_table;
+            $tableReferenceCallLogs = $tableReference . '_call_logs';
+            $mandatoryColumns = [];
+
+            $templateHeaders = TemplateHeader::where('template_id', $theCampaign->template_id)
+                ->whereNull('deleted_at')
+                ->get();
+
+            foreach ($templateHeaders AS $keyHeader => $valHeader) {
+                if ($valHeader->is_mandatory || ($valHeader->type === 'handphone')) {
+                    $mandatoryColumns[] = strtolower($tableReference . '.' . $valHeader->name);
+                }
+            }
+            // dd($mandatoryColumns);
+
+            $callLogs = DB::table($tableReferenceCallLogs)
+                ->select($tableReferenceCallLogs . '.*')
+                ->selectRaw(implode(', ', $mandatoryColumns))
+                ->leftJoin($tableReference, $tableReferenceCallLogs . '.contact_id', '=', $tableReference . '.id')
+                ->orderBy($tableReferenceCallLogs . '.id', 'ASC');
+
+            if($startDate){
+                $f_startdate = date('Y-m-d', strtotime(str_replace('/', '-', $startDate)));
+                $f_enddate = date('Y-m-d', strtotime(str_replace('/', '-', $endDate)));
+                $callLogs->whereRaw('DATE(' . $tableReferenceCallLogs . '.call_dial) BETWEEN ? AND ?', [$f_startdate, $f_enddate]);
+            }
+
+            // dd($callLogs->toSql());
+            $callLogs = $callLogs->get();
+            // dd($callLogs);
+        }
+
+        return array(
+            'campaign' => $theCampaign,
+            'call_logs' => $callLogs,
+            'template_headers' => $templateHeaders,
+        );
+    }
+
+    /*
+    public function exportData(Request $request)
+    {
+        $input = $request->all();
+
+        $validator = Validator::make($input, [
+            'export_startdate'=>'sometimes|required',
+            'export_enddate'=>'sometimes|required',
+        ]);
+
+        if ($validator->fails()) {
+            return back();
+        }
+
+        $campaign = null;
+        $reportHeaders = CustomReportHeaders::whereNull('deleted_at')->get();
+
+        $query = CallLog::leftJoin('contacts','call_logs.contact_id','=','contacts.id')
+                        ->select('contacts.id AS contact_id', 'contacts.account_id', 'contacts.phone', 'call_logs.call_dial', 'call_logs.call_connect', 'call_logs.call_disconnect', 'call_logs.call_duration', 'call_logs.call_response', 'call_logs.call_recording');
+                        
+
+        if($request->export_startdate && $request->export_enddate){
+            $startdate = date('Y-m-d', strtotime(str_replace('/', '-', $request->export_startdate)));
+            $enddate = date('Y-m-d', strtotime(str_replace('/', '-', $request->export_enddate)));
+            $query = $query->whereRaw('DATE(call_logs.call_dial) BETWEEN ? AND ?', [$startdate, $enddate]);
+        }
+
+        if($request->export_campaign){
+            $query = $query->where('contacts.campaign_id', $request->export_campaign);
+            $campaign = Campaign::where('id', $request->export_campaign)->first();
+        }
+
+        $callLogs = $query->orderBy('call_logs.id','ASC')->get();
+
+        $filename = 'report-call-logs-'.time();
+       
+        // excel
+        Excel::load(storage_path('app/public/files/Report_Call_Logs.xlsx'), function($file) use($request, $campaign, $callLogs) {
+            $sheet = $file->setActiveSheetIndex(0);
+            $subtitle = null;
+            if($request->export_startdate && $request->export_enddate){
+                $subtitle .= 'Date Range : '.$request->export_startdate.' - '.$request->export_enddate;
+            }
+
+            if($request->export_campaign){
+                $subtitle .= $request->export_startdate ? ' | ': '';
+                $subtitle .= 'Campaign : '.$campaign->name;
+            }
+            
+            $sheet->setCellValue('A2', $subtitle);
+
+            if ($reportHeaders->count() > 0) {
+                foreach($reportHeaders AS $keyHeader => $valHeader) {
+                    $sheet->setCellValueByColumnAndRow(9, 4, $valHeader->name);
+                }
+            }
+
+            $excelRowNumber = 5;
+            foreach ($callLogs->chunk(300) AS $rows) {
+                foreach($callLogs as $row){
+                    $sheet->setCellValue('A' . $excelRowNumber, date('d/m/Y', strtotime($row->call_dial)));
+                    $sheet->setCellValue('B' . $excelRowNumber, $row->account_id);
+                    $sheet->setCellValue('C' . $excelRowNumber, $row->phone);
+                    $sheet->setCellValue('D' . $excelRowNumber, date('H:i:s', strtotime($row->call_dial)));
+                    $sheet->setCellValue('E' . $excelRowNumber, $row->call_connect ? date('H:i:s', strtotime($row->call_connect)) : '');
+                    $sheet->setCellValue('F' . $excelRowNumber, $row->call_disconnect ? date('H:i:s', strtotime($row->call_disconnect)) : '');
+                    $sheet->setCellValue('G' . $excelRowNumber, $row->call_duration > 0 ? App\Helpers\Helpers::secondsToHms($row->call_duration) : '');
+                    $sheet->setCellValue('H' . $excelRowNumber, $row->call_response);
+                    $excelRowNumber++;
+                }
+            }
+
+        })->download('xlsx');
+
+    }
+    */
+
+    /*
     public function index(Request $request)
     {
         $campaigns = Campaign::select('id', 'unique_key', 'name')->get();
@@ -66,93 +377,7 @@ class CallLogController extends Controller
             'enddate' => $enddate
         ));
     }
-
-    public function exportData(Request $request)
-    {
-        $input = $request->all();
-
-        $validator = Validator::make($input, [
-            'export_startdate'=>'sometimes|required',
-            'export_enddate'=>'sometimes|required',
-        ]);
-
-        if ($validator->fails()) {
-            return back();
-        }
-
-        $campaign = null;
-        $query = CallLog::leftJoin('contacts','call_logs.contact_id','=','contacts.id')
-                        ->select('contacts.id AS contact_id', 'contacts.account_id', 'contacts.phone', 'call_logs.call_dial', 'call_logs.call_connect', 'call_logs.call_disconnect', 'call_logs.call_duration', 'call_logs.call_response', 'call_logs.call_recording');
-                        
-
-        if($request->export_startdate && $request->export_enddate){
-            $startdate = date('Y-m-d', strtotime(str_replace('/', '-', $request->export_startdate)));
-            $enddate = date('Y-m-d', strtotime(str_replace('/', '-', $request->export_enddate)));
-            $query = $query->whereRaw('DATE(call_logs.call_dial) BETWEEN ? AND ?', [$startdate, $enddate]);
-        }
-
-        if($request->export_campaign){
-            $query = $query->where('contacts.campaign_id', $request->export_campaign);
-            $campaign = Campaign::where('id', $request->export_campaign)->first();
-        }
-
-        $callLogs = $query->orderBy('call_logs.id','ASC')->get();
-
-        $filename = 'report-call-logs-'.time();
-       
-        // excel
-        Excel::load(storage_path('app/public/files/Report_Call_Logs.xlsx'), function($file) use($request, $campaign, $callLogs) {
-            $sheet = $file->setActiveSheetIndex(0);
-            $subtitle = null;
-            if($request->export_startdate && $request->export_enddate){
-                $subtitle .= 'Date Range : '.$request->export_startdate.' - '.$request->export_enddate;
-            }
-
-            if($request->export_campaign){
-                $subtitle .= $request->export_startdate ? ' | ': '';
-                $subtitle .= 'Campaign : '.$campaign->name;
-            }
-            
-            $sheet->setCellValue('A2', $subtitle);
-
-            $excelRowNumber = 5;
-            foreach ($callLogs->chunk(300) AS $rows) {
-                foreach($callLogs as $row){
-                    $sheet->setCellValue('A' . $excelRowNumber, date('d/m/Y', strtotime($row->call_dial)));
-                    $sheet->setCellValue('B' . $excelRowNumber, $row->account_id);
-                    $sheet->setCellValue('C' . $excelRowNumber, $row->phone);
-                    $sheet->setCellValue('D' . $excelRowNumber, date('H:i:s', strtotime($row->call_dial)));
-                    $sheet->setCellValue('E' . $excelRowNumber, $row->call_connect ? date('H:i:s', strtotime($row->call_connect)) : '');
-                    $sheet->setCellValue('F' . $excelRowNumber, $row->call_disconnect ? date('H:i:s', strtotime($row->call_disconnect)) : '');
-                    $sheet->setCellValue('G' . $excelRowNumber, $row->call_duration > 0 ? App\Helpers\Helpers::secondsToHms($row->call_duration) : '');
-                    $sheet->setCellValue('H' . $excelRowNumber, $row->call_response);
-                    $excelRowNumber++;
-                }
-            }
-
-        })->download('xlsx');
-
-    }
-
-    public function recording(Request $request)
-    {
-        $audio = $request->audio;
-        
-        $checkpath  = '/var/spool/asterisk/monitor/'.$audio;            
-        if(file_exists($checkpath)){
-            $filepath = $checkpath;
-        }else{
-            $filepath = '/home/asterisk-recording/'.$audio;
-        }
-
-        header("Content-Transfer-Encoding: binary"); 
-        header("Content-Type: audio/wav");
-        header('Content-Disposition:: inline; filename="'.$audio.'"');
-        header('Content-length: '.filesize($filepath));
-        header('Cache-Control: no-cache');
-        header('Accept-Ranges: bytes');
-        readfile($filepath);
-    }
+    */
 
     /*
     public function exportData(Request $request)

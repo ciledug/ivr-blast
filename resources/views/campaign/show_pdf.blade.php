@@ -24,8 +24,7 @@
     }
 
     #main {
-      margin-top: 0px;
-      padding: 20px 30px;
+      margin-top: 0px !important;
     }
 
     #export-campaign-header {
@@ -33,89 +32,141 @@
     }
 
     @page {
-      margin: 0;
-      padding: 0;
+      margin: 40px 40px !important;
+      padding: 0 !important;
       background-color: white;
     }
+
     .table-data{
       border-collapse: collapse !important;
     }
+
     .table-data tr th,
-    .table-data tr td{
+    .table-data tr td {
       border:.5px solid #000;
       padding:2px 4px;
+    }
+
+    .text-center {
+      text-align: center;
+    }
+
+    .text-right {
+      text-align: right;
+    }
+
+    .bg-primary {
+      background-color: #6776f4;
+      color: white;
+    }
+
+    .bg-info {
+      background-color: #f0f8fa;
     }
   </style>
 </head>
 
 <body>
 
+  {{-- @php dd($campaign) @endphp --}}
+
 <main id="main" class="main">
     <div class="row">
       <div class="col-lg-12">
 
-        <h5 class="card-title"></h5>
-
-        <div id="export-campaign-header" class="col-md-12 mt-4">
+        <div id="export-campaign-header">
           <table class="table table-hover" style="width:100%;">
             <tr>
-              <td style="width:50%;"><span style="font-weight:bold">Name</span><br>{{ $campaign->name or '' }}</td>
-              <td style="width:50%;"><span style="font-weight:bold">Date Started</span><br>{{ $campaign->started ? date('d/m/Y - H:i', strtotime($campaign->started)) : '-' }}</td>
+              <td style="width:50%;"><span style="font-weight:bold">Name</span><br>{{ $campaign[0]->camp_name or '' }}</td>
+              <td style="width:50%;"><span style="font-weight:bold">Date Started</span><br>{{ $campaignInfo->started ? date('d/m/Y - H:i', strtotime($campaignInfo->started)) : '-' }}</td>
             </tr>
             <tr>
-              <td style="width:50%; padding-top:0.85em;"><span style="font-weight:bold">Total Data</span><br>{{ $campaign->total_data or '0' }}</td>
-              <td style="width:50%; padding-top:0.85em;"><span style="font-weight:bold">Date Finished</span><br>{{ $campaign->finished ? date('d/m/Y - H:i', strtotime($campaign->finished)) : '-' }}</td>
+              <td style="width:50%; padding-top:0.85em;"><span style="font-weight:bold">Total Data</span><br>{{ $campaign[0]->camp_total_data or '0' }}</td>
+              <td style="width:50%; padding-top:0.85em;"><span style="font-weight:bold">Date Finished</span><br>{{ $campaignInfo->finished ? date('d/m/Y - H:i', strtotime($campaignInfo->finished)) : '-' }}</td>
             </tr>
             <tr>
-              <td style="width:50%; padding-top:0.85em;"><span style="font-weight:bold">Status</span><br>{{ $campaign->status or '-' }}</td>
-              <td style="width:50%; padding-top:0.85em;"><span style="font-weight:bold">Total Calls</span><br>{{ $campaign->total_calls or '0' }}</td>
+              <td style="width:50%; padding-top:0.85em;">
+                <span style="font-weight:bold">Status</span><br>
+                @php
+                switch ($campaign[0]->camp_status) {
+                  case 0: echo 'Ready'; break;
+                  case 1: echo 'Running'; break;
+                  case 2: echo 'Paused'; break;
+                  case 3: echo 'Finished'; break;
+                  default: echo '-'; break;
+                }
+                @endphp
+              </td>
+              <td style="width:50%; padding-top:0.85em;"><span style="font-weight:bold">Total Calls</span><br>{{ $campaignInfo->total_calls or '0' }}</td>
             </tr>
             <tr>
-              <td style="width:50%; padding-top:0.85em;"><span style="font-weight:bold">Created Date</span><br>{{ date('d/m/Y - H:i', strtotime($campaign->created_at)) }}</td>
-              <td style="width:50%; padding-top:0.85em;"><span style="font-weight:bold">Success Calls</span><br>{{ $campaign->success or '0' }}</td>
+              <td style="width:50%; padding-top:0.85em;"><span style="font-weight:bold">Created Date</span><br>{{ date('d/m/Y - H:i', strtotime($campaign[0]->camp_created_at)) }}</td>
+              <td style="width:50%; padding-top:0.85em;"><span style="font-weight:bold">Success Calls</span><br>{{ $campaignInfo->success or '0' }}</td>
             </tr>
             <tr>
-              <td style="width:50%; padding-top:0.85em;"><span style="font-weight:bold">Campaign Progress (%)</span><br>{{ $campaign->progress or '0' }}</td>
-              <td style="width:50%; padding-top:0.85em;"><span style="font-weight:bold">Failed Calls</span><br>{{ $campaign->failed or '0' }}</td>
+              <td style="width:50%; padding-top:0.85em;"><span style="font-weight:bold">Campaign Progress (%)</span><br>{{ $progress or '0' }}</td>
+              <td style="width:50%; padding-top:0.85em;"><span style="font-weight:bold">Failed Calls</span><br>{{ $campaignInfo->failed or '0' }}</td>
             </tr>
           </table>
         </div>
 
         <hr style="border:none;" />
 
-        <div class="col-md-12 mt-4" style="padding-top:0.85em;">
+        <div style="padding-top:0.85em;">
+          @php $headerName = ''; @endphp
+          
           <table class="table table-hover table-data" style="width:100%; font-size:0.73em;">
             <thead>
-              <tr>
-                {{-- <th scope="col">#</th> --}}
-                <th scope="col">Account ID</th>
-                <th scope="col">Name</th>
-                <th scope="col">Phone</th>
-                <th scope="col">Bill Date</th>
-                <th scope="col">Due Date</th>
-                <th scope="col">Nominal (Rp.)</th>
-                <th scope="col">Call Date</th>
-                <th scope="col">Call Response</th>
-                <th scope="col">Total Calls</th>
-              </tr>
+              <tr class="bg-primary">
+                <th scope="col" class="text-center">#</th>
+                @foreach ($campaign AS $keyCamp => $valCamp)
+                <th scope="col">{{ strtoupper($valCamp->header_name) }}</th>
+                @endforeach
 
+                <th scope="col">CALL DATE</th>
+                <th scope="col">CALL RESPONSE</th>
+                <th scope="col">TOTAL CALLS</th>
+              </tr>
+            </thead>
+
+            <tbody>
               @foreach($contacts->chunk(300) AS $datacontact)
                 @foreach($datacontact AS $contact)
+
+                @if ($loop->iteration % 2 == 0)
+                <tr class="bg-info">
+                @else
                 <tr>
-                  {{-- <td>{{ $loop->iteration }}.</td> --}}
-                  <td>{{ $contact->ACCOUNT_ID }}</td>
-                  <td>{{ $contact->CONTACT_NAME }}</td>
-                  <td>{{ $contact->CONTACT_PHONE }}</td>
-                  <td>{{ $contact->BILL_DATE }}</td>
-                  <td>{{ $contact->DUE_DATE }}</td>
-                  <td>{{ number_format($contact->NOMINAL, 0, ',', '.') }}</td>
-                  <td>{{ $contact->CALL_DATE ? date('d/m/Y - H:i', strtotime($contact->CALL_DATE)) : '' }}</td>
-                  <td>{{ $contact->CALL_RESPONSE }}</td>
-                  <td>{{ number_format($contact->TOTAL_CALLS, 0, ',', '.') }}</td>
+                @endif
+
+                  <td class="text-right">{{ $loop->iteration }}.</td>
+                  @php
+                  foreach ($campaign AS $keyCamp => $valCamp) {
+                    $headerName = strtolower($valCamp->header_name);
+                    switch ($valCamp->header_type) {
+                      case 'numeric':
+                        echo '<td class="text-right">' . number_format($contact->$headerName, 0, ',', '.');
+                        break;
+                      case 'handphone':
+                        echo '<td>' . substr($contact->$headerName, 0, 4) . 'xxxxxx' . substr($contact->$headerName, strlen($contact->$headerName) - 3);
+                        break;
+                      default:
+                        echo '<td>' . $contact->$headerName;
+                        break;
+                    }
+                    echo '</td>';
+                  }
+                  @endphp
+
+                  <td>{{ $contact->call_dial ? date('d/m/Y - H:i', strtotime($contact->call_dial)) : '' }}</td>
+                  <td>{{ $contact->call_response ? $contact->call_response : '' }}</td>
+                  <td class="text-right" style="padding-right:10px;">{{ number_format($contact->total_calls, 0, ',', '.') }}</td>
+
                 </tr>
                 @endforeach
               @endforeach
-            </thead>
+            </tbody>
+            
           </table>
         </div>
 

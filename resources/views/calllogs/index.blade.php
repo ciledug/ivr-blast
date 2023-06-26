@@ -21,7 +21,13 @@
           <div class="card-body">
             <form action="{{ route('calllogs') }}" method="GET" id="form-filter">
               {{ csrf_field() }}
-              <div class="row mt-4 mb-4">
+              <div class="row mt-4">
+                <div class="col-md-6">Call Dial Date</div>
+                <div class="col-md-6 text-end"><label for="select-campaign-list">Select Campaign</label></div>
+              </div>
+              
+              <div class="row mt-2 mb-4">
+                <!-- call-logs date -->
                 <div class="col-md-6">
                   <div class="row form-group">
                     <div class="col-md-4">
@@ -30,6 +36,7 @@
                     <div class="col-md-4">
                       <input type="text" name="enddate" class="form-control" placeholder="End Date" readonly id="enddate" value="{{ $enddate ? $enddate : null }}">
                     </div>
+
                     @if($startdate)
                     <div class="col-md-4">
                       <a href="{{ route('calllogs') }}" class="btn btn-outline-primary">Clear Date</a>
@@ -37,15 +44,17 @@
                     @endif
                   </div>
                 </div>
+
+                <!-- campaigns drop-down -->
                 <div class="col-md-4 offset-md-2">
-                    <select class="form-select" id="select-campaign-list" aria-label="Campaign" name="campaign">
-                      <option value="" selected>-- All Campaign --</option>
-                      @foreach ($campaigns AS $keyCampaign => $valueCampaign)
-                        @if ($valueCampaign->id === $selectedCampaign)
-                        <option value="{{ $valueCampaign->id }}" selected>{{ $valueCampaign->name }}</option>
-                        @else
-                        <option value="{{ $valueCampaign->id }}">{{ $valueCampaign->name }}</option>
-                        @endif
+                  <select class="form-select" id="select-campaign-list" aria-label="Campaign" name="campaign">
+                    <option value="" selected></option>
+                    @foreach ($campaigns AS $keyCampaign => $valueCampaign)
+                      @if ($valueCampaign->id === $selectedCampaign)
+                      <option value="{{ $valueCampaign->id }}" selected>{{ $valueCampaign->name }}</option>
+                      @else
+                      <option value="{{ $valueCampaign->id }}">{{ $valueCampaign->name }}</option>
+                      @endif
                       @endforeach
                     </select>
                 </div>
@@ -53,32 +62,58 @@
             </form>
 
             <table id="table-campaign-list-container" class="table table-hover">
-              <thead>
+              <thead class="align-top">
                 <tr>
-                  <th scope="col">Call Date</th>
-                  <th scope="col">Account ID</th>
-                  <th scope="col">Phone Number</th>
-                  <th scope="col" width="110px" >Dial</th>
-                  <th scope="col" width="110px" >Connect</th>
-                  <th scope="col" width="110px" >Disconnect</th>
-                  <th scope="col" width="110px" >Duration</th>
-                  <th scope="col">Call Response</th>
-                  <th scope="col" width="80px" class="text-center">Recording</th>
+                  @if (count($template_headers) > 0)
+                    <th scope="col" class="align-top text-center">#</th>
+                    
+                    @foreach($template_headers AS $keyHeader => $valHeader)
+                    <th scope="col" class="align-top">{{ strtoupper($valHeader->name) }}</th>
+                    @endforeach
+                      
+                    <th scope="col" class="align-top">CALL DIAL</th>
+                    <th scope="col" class="align-top">CALL CONNECT</th>
+                    <th scope="col" class="align-top">CALL DISCONNECT</th>
+                    <th scope="col" class="align-top">CALL DURATION</th>
+                    <th scope="col" class="align-top">CALL RESPONSE</th>
+                    <th scope="col" class="align-top">RECORDING</th>
+                  @else
+                  <th scope="col" class="align-top"></th>
+                  @endif
                 </tr>
               </thead>
 
               <tbody>
-                @if($calllogs->count() > 0)
+                @if(!is_array($calllogs) && $calllogs->count() > 0)
                   @foreach ($calllogs AS $keyCallLog => $valueCallLog)
                   <tr>
-                    <td>{{ date('d/m/Y', strtotime($valueCallLog->call_dial)) }}</td>
-                    <td>{{ $valueCallLog->account_id }}</td>
-                    <td>{{ $valueCallLog->phone }}</td>
-                    <td>{{ date('H:i:s', strtotime($valueCallLog->call_dial)) }}</td>
+                    <td class="text-end">{{ $row_number++ }}.</td>
+
+                    @foreach($template_headers AS $keyHeader => $valHeader)
+                      @php $columnName = strtolower($valHeader->name) @endphp
+                      @if ($valHeader->is_mandatory)
+                        @if ($valHeader->column_type === 'string')
+                        <td>{{ $valueCallLog->$columnName }}</td>
+                        @elseif ($valHeader->column_type === 'handphone')
+                        <td>{{ substr($valueCallLog->$columnName, 0, 4) . 'xxxxxx' . substr($valueCallLog->$columnName, strlen($valueCallLog->$columnName) - 3) }}</td>
+                        @elseif ($valHeader->column_type === 'numeric')
+                        <td class="text-end">{{ number_format($valueCallLog->$columnName, 0, '.', '.') }}</td>
+                        @elseif ($valHeader->column_type === 'datetime')
+                        <td>{{ date('d/m/Y H:i:s', strtotime($valueCallLog->$columnName)) }}</td>
+                        @elseif ($valHeader->column_type === 'date')
+                        <td>{{ date('d/m/Y', strtotime($valueCallLog->$columnName)) }}</td>
+                        @elseif ($valHeader->column_type === 'time')
+                        <td>{{ date('H:i:s', strtotime($valueCallLog->$columnName)) }}</td>
+                        @endif
+                      @endif
+                    @endforeach
+
+                    <td>{{ $valueCallLog->call_dial ? date('d/m/Y', strtotime($valueCallLog->call_dial)) : '' }}</td>
                     <td>{{ $valueCallLog->call_connect ? date('H:i:s', strtotime($valueCallLog->call_connect)) : '' }}</td>
                     <td>{{ $valueCallLog->call_disconnect ? date('H:i:s', strtotime($valueCallLog->call_disconnect)) : '' }}</td>
-                    <td>{{ $valueCallLog->call_duration > 0 ? App\Helpers\Helpers::secondsToHms($valueCallLog->call_duration) : '' }}</td>
+                    <td class="text-end">{{ $valueCallLog->call_duration > 0 ? App\Helpers\Helpers::secondsToHms($valueCallLog->call_duration) : '' }}</td>
                     <td>{{ $valueCallLog->call_response }}</td>
+
                     <td style="padding:4px 0;" class="text-center" >
                       @if (!empty($valueCallLog->call_duration))
                       <button type="button" class="btn btn-success btn-sm btn-play-recording" data-bs-toggle="modal" data-bs-target="#modal-play-recording" data-value="{{ $valueCallLog->call_recording }}">
@@ -90,15 +125,18 @@
                   @endforeach
                 @else
                   <tr>
-                    <td colspan="9" class="text-center">There's no data</td>
+                    <td colspan="{{ $template_headers->count() + 7 }}" class="text-center">No call logs data</td>
                   </tr>
                 @endif
               </tbody>
             </table>
 
-            {{ $calllogs->links() }}
+            @if (!is_array($calllogs))
+              {{ $calllogs->links() }}
+            @endif
 
-            {{-- <div class="col-md-12 mt-4">
+            {{--
+            <div class="col-md-12 mt-4">
               <form id="form-campaign-export" class="g-3 needs-validation" method="POST" target="_blank" action="{{ route('calllogs.export') }}" enctype="multipart/form-data">
                 <button type="button" class="btn btn-success btn-export-as" id="btn-export-excel" data-export-as="excel">Export Excel</button>
                 <button type="button" class="btn btn-danger btn-export-as" id="btn-export-pdf" data-export-as="pdf">Export PDF</button>
@@ -108,7 +146,8 @@
                 <input type="hidden" name="enddate" value="{{ $enddate }}">
                 {{ csrf_field() }}
               </form>
-            </div> --}}
+            </div>
+            --}}
 
           </div>
         </div>
@@ -203,6 +242,7 @@
 <script type="text/javascript">
   $(document).ready(function() {
     preparePlayRecordingButtons();
+    prepareChangeCampaignDropDown();
     
     $('#btn-close-play-recording').click(function(e) {
       const audio = document.getElementById('audio-player-container');
@@ -248,12 +288,13 @@
     });
   };
 
-  // function prepareChangeCampaignDropDown() {
-  //   $('#select-campaign-list').change(function() {
-  //     $('#modal-spinner').modal('show');
-  //     location.href = '{/{ route('calllogs') }}/' + $(this).find(':selected').val();
-  //   });
-  // };
+  function prepareChangeCampaignDropDown() {
+    $('#select-campaign-list').change(function() {
+      $('#startdate, #enddate').val('');
+      $('#modal-spinner').modal('show');
+      location.href = '{{ route('calllogs') }}/' + $(this).find(':selected').val();
+    });
+  };
 
 
   // Export
@@ -308,7 +349,6 @@
       $(formExport).find('#export-startdate, #export-enddate').removeAttr('disabled');
     }
   });
-
   
   elModalExport.querySelector('#btn-submit-export').addEventListener('click', () => {
     formExport.querySelector('button[type="submit"]').click();

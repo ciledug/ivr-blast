@@ -15,8 +15,7 @@ class CreateUserLogsTable extends Migration
     {
         Schema::create('user_logs', function (Blueprint $table) {
             $table->engine = 'MyISAM';
-            $table->collation = 'utf8mb4_unicode_ci';
-
+            
             $table->increments('id');
             $table->integer('user_id')->unsigned();
             $table->dateTime('last_login')->default(null)->nullable();

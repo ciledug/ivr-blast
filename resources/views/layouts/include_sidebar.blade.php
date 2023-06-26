@@ -59,7 +59,22 @@
                 <span>My Account</span>
             </a>
         </li>
+
+        @if (Auth::user()->username === 'sadmin')
+        <!-- template -->
+        <li class="nav-item">
+            @if (str_contains(Route::currentRouteName(), 'templates'))
+            <a class="nav-link" href="{{ url('/templates') }}">
+            @else
+            <a class="nav-link collapsed" href="{{ url('/templates') }}">
+            @endif
+                <i class="bi bi-person"></i>
+                <span>Templates</span>
+            </a>
+        </li>
+        @endif
     
+        {{-- logout --}}
         <li class="nav-item">
             <a class="nav-link collapsed" href="#" onclick="submitLogout(event)">
                 <i class="bi bi-person"></i>

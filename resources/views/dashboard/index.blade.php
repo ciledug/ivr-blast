@@ -14,7 +14,7 @@
         <div class="row">
           <div class="card">
             <div class="card-body" style="min-height: 465px;">
-              <h5 class="card-title">Running Campaigns</h5>
+              <h5 class="card-title">Currently Running Campaigns</h5>
 
               <table id="table-running-campaign-list-container" class="table">
                 <thead>

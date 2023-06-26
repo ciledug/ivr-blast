@@ -30,6 +30,8 @@
   <link href="{{ url('css/jquery.dataTables.min.css') }}" rel="stylesheet">
   <link href="{{ url('css/dataTables.bootstrap5.min.css') }}" rel="stylesheet">
 
+  @stack('css')
+
   <!-- Template Main CSS File -->
   <link href="{{ url('css/style.css') }}" rel="stylesheet">
 </head>

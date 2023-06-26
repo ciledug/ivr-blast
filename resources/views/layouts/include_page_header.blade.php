@@ -179,6 +179,11 @@
                     <li class="dropdown-header">
                         <h6>{{ Auth::user()->name }}</h6>
                     </li>
+
+                    <li>
+                        <hr class="dropdown-divider">
+                    </li>
+                    
                     <li>
                         <a class="dropdown-item d-flex align-items-center" href="#" onclick="submitLogout(event)">
                             <i class="bi bi-box-arrow-right"></i>

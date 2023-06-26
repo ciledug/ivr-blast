@@ -21,12 +21,41 @@ class ContactController extends Controller
     {
     }
 
+    /*
     public function show(Request $request, $id)
     {
         $contact = Contact::find($id);
         $dataLogs = CallLog::where('contact_id', $contact->id)->orderBy('id', 'ASC')->get();
 
         return view('contact.show', compact('contact', 'dataLogs'));
+    }
+    */
+
+    public function show(Request $request, $id, $campaignId)
+    {
+        $campaignHeaders = Campaign::select(
+                'campaigns.template_id', 'campaigns.reference_table',
+                'template_headers.name AS templ_header_name', 'template_headers.column_type AS templ_column_type'
+            )
+            ->leftJoin('template_headers', 'campaigns.template_id', '=', 'template_headers.template_id')
+            ->where('campaigns.id', $campaignId)
+            ->whereNull('campaigns.deleted_at')
+            ->get();
+        // dd($campaignHeaders);
+
+        $referenceTable = $campaignHeaders[0]->reference_table;
+
+        $contact = DB::table($referenceTable)
+            ->select($referenceTable . '.*', $referenceTable . '_call_logs.*', $referenceTable . '_call_logs.created_at AS call_logs_created_at')
+            ->leftJoin($referenceTable . '_call_logs', $referenceTable . '.id', '=', $referenceTable . '_call_logs.contact_id')
+            ->where($referenceTable . '.id', $id)
+            ->get();
+        // dd($contact);
+
+        return view('contact.show', [
+            'campaign_headers' => $campaignHeaders,
+            'contact' => $contact,
+        ]);
     }
 
     public function contactList(Request $request, $campaign) {

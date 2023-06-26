@@ -25,7 +25,8 @@ Route::group(
         Route::prefix('campaigns')->group(function() {
             Route::get('/', "CampaignController@index")->name('campaigns');
             Route::get('create', "CampaignController@create")->name('campaigns.create');
-            Route::get('template', "CampaignController@downloadTemplate")->name('campaigns.template');
+            Route::get('template/{templateId}', "CampaignController@downloadTemplate")->name('campaigns.template');
+            Route::get('importprogress', 'CampaignController@importProgress')->name('campaigns.importprogress');
             Route::get('{id}', "CampaignController@show")->name('campaigns.show');
             Route::get('{id}/edit', "CampaignController@edit")->name('campaigns.edit');
             Route::get('{id}/delete', "CampaignController@delete")->name('campaigns.delete');
@@ -67,7 +68,10 @@ Route::group(
         });
 
         Route::prefix('contacts')->group(function() {
-            Route::get('{id}', 'ContactController@show')->name('contacts.show');
+            // Route::get('{id}', 'ContactController@show')->name('contacts.show');
+            Route::get('{id}/{campaignId}', 'ContactController@show')->name('contacts.show');
         });
+        
+        Route::resource('templates', 'TemplateController');
     }
 );

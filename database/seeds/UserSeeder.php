@@ -15,11 +15,19 @@ class UserSeeder extends Seeder
         DB::table('users')->truncate();
 
         DB::table('users')->insert([
+            'name' => 'Super Admin',
+            'username' => 'sadmin',
+            'email' => 'sadmin@ivrblast.com',
+            'password' => Hash::make('123456'),
+            'added_by' => 'sadmin',
+        ]);
+
+        DB::table('users')->insert([
             'name' => 'Admin',
             'username' => 'admin',
-            'email' => 'admin@gmail.com',
-            'password' => Hash::make('12345678'),
-            'added_by' => 'Admin',
+            'email' => 'admin@ivrblast.com',
+            'password' => Hash::make('123456'),
+            'added_by' => 'sadmin',
         ]);
     }
 }

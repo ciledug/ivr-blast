@@ -26,77 +26,23 @@
             </h5>
 
             <div class="row">
-              <!-- left column -->
-              <div class="col">                
-                <div class="row">
-                  <div class="col-md-12 mt-2">
-                    <div class="row">
-                      <div class="col-lg-4 col-md-4 label">Account ID</div>
-                    </div>
-                    <div class="row">
-                      <div class="col-lg-8 col-md-8 h5" id="dialog-detail-contact-account-id">{{ $contact->account_id }}</div>
+              @foreach($campaign_headers AS $keyHeader => $valHeader)
+                @php $headerName = strtolower($valHeader->templ_header_name); @endphp
+
+                <div class="col-lg-4 col-md-6 mt-2">
+                  <div class="row">
+                    <div class="col-12 label fw-bold">{{ $valHeader->templ_header_name }}</div>
+                  </div>
+                  <div class="row">
+                    <div class="col-12 h5">
+                      @if ($valHeader->templ_column_type === 'numeric') {{ number_format($contact[0]->$headerName, 0, ',', '.') }}
+                      @else {{ $contact[0]->$headerName }}
+                      @endif
                     </div>
                   </div>
                 </div>
 
-                <div class="row">
-                  <div class="col-md-12 mt-2">
-                    <div class="row">
-                      <div class="col-lg-4 col-md-4 label">Name</div>
-                    </div>
-                    <div class="row">
-                      <div class="col-lg-8 col-md-8 h5" id="dialog-detail-contact-name">{{ $contact->name }}</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="row">
-                  <div class="col-md-12 mt-2">
-                    <div class="row">
-                      <div class="col-lg-4 col-md-4 label">Phone</div>
-                    </div>
-                    <div class="row">
-                      <div class="col-lg-8 col-md-8 h5" id="dialog-detail-contact-phone">{{ $contact->phone }}</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- right column -->
-              <div class="col">
-                <div class="row">
-                  <div class="col-md-12">
-                    <div class="row">
-                      <div class="col-lg-4 col-md-4 label">Bill Date</div>
-                    </div>
-                    <div class="row">
-                      <div class="col-lg-8 col-md-8 h5" id="dialog-detail-contact-bill-date">{{ $contact->bill_date }}</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="row">
-                  <div class="col-md-12 mt-2">
-                    <div class="row">
-                      <div class="col-lg-4 col-md-4 label">Due Date</div>
-                    </div>
-                    <div class="row">
-                      <div class="col-lg-8 col-md-8 h5" id="dialog-detail-contact-due-date">{{ $contact->due_date }}</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="row">
-                  <div class="col-md-12 mt-2">
-                    <div class="row">
-                      <div class="col-lg-5 col-md-4 label">Nominal (Rp.)</div>
-                    </div>
-                    <div class="row">
-                      <div class="col-lg-7 col-md-8 h5" id="dialog-detail-contact-nominal">{{ number_format($contact->nominal,0,'.','.') }}</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              @endforeach
             </div>
 
             <hr>
@@ -110,40 +56,42 @@
                 <table class="table table-bordered">
                   <thead>
                     <tr>
-                      <th scope="col">Call Date</th>
-                      <th scope="col">Call Dial</th>
-                      <th scope="col">Call Connect</th>
-                      <th scope="col">Call Disconnect</th>
-                      <th scope="col">Call Duration</th>
-                      <th scope="col">Call Response</th>
-                      <th scope="col" style="text-align: center;" width="100px">Recording</th>
+                      <th scope="col">CALL DATE</th>
+                      <th scope="col">CALL DIAL</th>
+                      <th scope="col">CALL CONNECT</th>
+                      <th scope="col">CALL DISCONNECT</th>
+                      <th scope="col">CALL DURATION</th>
+                      <th scope="col">CALL RESPONSE</th>
+                      <th scope="col">RECORDING</th>
                     </tr>
                   </thead>
 
                   <tbody>
-                    @if($dataLogs->count() > 0)
-                      @foreach($dataLogs as $logs)
-                        <tr>
-                          <td>{{ date('d/m/Y', strtotime($logs->call_dial)) }}</td>
-                          <td>{{ date('H:i:s', strtotime($logs->call_dial)) }}</td>
-                          <td>{{ $logs->call_connect ? date('H:i:s', strtotime($logs->call_connect)) : '' }}</td>
-                          <td>{{ $logs->call_disconnect ? date('H:i:s', strtotime($logs->call_disconnect)) : '' }}</td>
-                          <td>{{ $logs->call_duration > 0 ? App\Helpers\Helpers::secondsToHms($logs->call_duration) : '' }}</td>
-                          <td>{{ $logs->call_response }}</td>
-                          <td style="text-align: center;padding:4px 0px">
-                            @if($logs->call_duration > 0)
-                              <button type="button" class="btn btn-sm btn-success btn-play-recording" data-bs-toggle="modal" data-bs-target="#modal-play-recording" data-value="{{ $logs->call_recording }}">
-                                <i class="bi bi-play-fill"></i> 
-                              </button>
-                            @endif
-                          </td>
-                        </tr>
-                      @endforeach
+                  @foreach($contact as $logs)
+                    @if ($logs->call_logs_created_at)
+                      <tr>
+                        <td>{{ date('d/m/Y', strtotime($logs->call_dial)) }}</td>
+                        <td>{{ date('H:i:s', strtotime($logs->call_dial)) }}</td>
+                        <td>{{ $logs->call_connect ? date('H:i:s', strtotime($logs->call_connect)) : '' }}</td>
+                        <td>{{ $logs->call_disconnect ? date('H:i:s', strtotime($logs->call_disconnect)) : '' }}</td>
+                        <td>{{ $logs->call_duration > 0 ? App\Helpers\Helpers::secondsToHms($logs->call_duration) : '' }}</td>
+                        <td>{{ $logs->call_response }}</td>
+
+                        <td style="text-align: center;padding:4px 0px">
+                          @if($logs->call_duration > 0)
+                            <button type="button" class="btn btn-sm btn-success btn-play-recording" data-bs-toggle="modal" data-bs-target="#modal-play-recording" data-value="{{ $logs->call_recording }}">
+                              <i class="bi bi-play-fill"></i> 
+                            </button>
+                          @endif
+                        </td>
+                      </tr>
                     @else
                       <tr>
                         <td colspan="7" style="text-align: center">There's no call logs data</td>
                       </tr>
                     @endif
+                  @endforeach
+
                   </tbody>
                 </table>  
               </div>

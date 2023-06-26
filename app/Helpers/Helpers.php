@@ -91,6 +91,7 @@ class Helpers
 		return trim($day).' '.trim($month).' '.trim($year);
 	}
 	
+	/*
 	static function generateVoice($data)
 	{
 		// data is array contain bill_date, due_date, nominal and filename to generate file voice
@@ -101,6 +102,24 @@ class Helpers
 		$fileVoice = 'main1.wav '.trim(self::generateDate($billDate)).' main2.wav '.trim(self::generateNumber($nominal)).' main3.wav '.trim(self::generateDate($dueDate)).' main4.wav';
 		
 		return $fileVoice;
+	}
+	*/
+
+	static function generateVoice($voiceColumns, $dataRow)
+	{
+		$tempGenerates = [];
+		$headerName = '';
+
+		foreach ($voiceColumns AS $keyVoice => $valVoice) {
+			$headerName = strtolower($valVoice->name);
+			switch ($valVoice->column_type) {
+				case 'numeric': $tempGenerates[] = self::generateNumber($dataRow->$headerName); break;
+				case 'date': $tempGenerates[] = self::generateDate($dataRow->$headerName); break;
+				default: break;
+			}
+		}
+		// dd($tempGenerates);
+		return implode(' ', $tempGenerates);
 	}
 
 

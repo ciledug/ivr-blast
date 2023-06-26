@@ -15,8 +15,7 @@ class CreateUsersTable extends Migration
     {
         Schema::create('users', function (Blueprint $table) {
             $table->engine = 'MyISAM';
-            $table->collation = 'utf8mb4_unicode_ci';
-
+            
             $table->increments('id');
             $table->string('name', 50);
             $table->string('username', 20)->unique();

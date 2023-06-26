@@ -14,17 +14,20 @@ class CreateCampaignTable extends Migration
     public function up()
     {
         Schema::create('campaigns', function (Blueprint $table) {
-            $table->engine = 'MyISAM';
+            // $table->engine = 'MyISAM';
+            $table->charset = 'utf8mb4';
             $table->collation = 'utf8mb4_unicode_ci';
             
             $table->increments('id');
             $table->string('unique_key', 20)->unique();
             $table->string('name', 50);
-            //$table->string('excel_name', 100)->default(null)->nullable();
-            $table->integer('total_data')->unsigned()->default(0);
-            //$table->smallInteger('total_calls')->unsigned()->default(0)->nullable();
-            $table->integer('status')->default(0)->comment('0=ready, 1=running, 2=paused, 3=finished');
-            $table->integer('created_by');
+            $table->integer('total_data')->unsigned()->default(0)->nullable();
+            $table->tinyinteger('status')->unsigned()->default(0)->nullable()->comment('0=ready, 1=running, 2=paused, 3=finished');
+            $table->tinyInteger('created_by')->unsigned();
+            $table->tinyInteger('template_id')->unsigned();
+            $table->string('reference_table', 100);
+            $table->text('text_voice')->nullable();
+            $table->string('voice_gender')->nullable()->comment('male_normal, male_strong, female_normal, female_strong');
             $table->timestamps();
             $table->softDeletes();
         });

@@ -15,7 +15,6 @@ class CreateCallLogsTable extends Migration
     {
         Schema::create('call_logs', function (Blueprint $table) {
             $table->engine = 'MyISAM';
-            $table->collation = 'utf8mb4_unicode_ci';
             
             $table->increments('id');
             $table->integer('contact_id')->unsigned();

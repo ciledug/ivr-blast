@@ -3,17 +3,22 @@
 namespace App\Http\Controllers;
 
 // use Anouar\Fpdf\Facades\Fpdf;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
 use Carbon\Carbon;
 
 use App\CallLog;
 use App\Campaign;
 use App\Contact;
+use App\Template;
+use App\TemplateHeader;
 use Maatwebsite\Excel\Facades\Excel;
 
 use App;
@@ -23,22 +28,33 @@ use App\Helpers\Helpers;
 
 class CampaignController extends Controller
 {
+    static private $totalContactRows = 0;
+    static private $newContacts = [];
+    static private $existingContacts = [];
+    static private $isStillProgress = true;
+
     public function __construct()
     {
         $this->middleware('auth');
     }
-    
+
     public function index()
     {
         $campaigns = Campaign::select(
-                'campaigns.id', 'campaigns.name', 'campaigns.total_data', 'campaigns.status', 'campaigns.created_at'
+                'campaigns.id', 'campaigns.name', 'campaigns.total_data', 'campaigns.status', 'campaigns.reference_table', 'campaigns.created_at',
+                'users.name AS created_by'
             )
-            ->selectRaw('
-                users.name AS created_by,
-                (SELECT COUNT(contacts.call_dial) FROM contacts WHERE contacts.campaign_id = campaigns.id AND contacts.call_dial IS NOT NULL) AS dialed_contacts
-            ')
             ->leftjoin('users', 'campaigns.created_by', '=', 'users.id')
+            ->orderBy('campaigns.id', 'DESC')
             ->paginate(15);
+        // dd($campaigns);
+
+        foreach ($campaigns AS $keyCampaign => $valCampaign) {
+            $dialed = DB::table($valCampaign->reference_table)
+                ->whereNotNull('call_dial')
+                ->count('call_dial');
+            $campaigns[$keyCampaign]['dialed_contacts'] = $dialed;
+        }
 
         $rowNumber = $campaigns->firstItem();
 
@@ -48,11 +64,37 @@ class CampaignController extends Controller
         ]);
     }
 
+    /*
+    public function index()
+    {
+        $campaigns = Campaign::select(
+                'campaigns.id', 'campaigns.name', 'campaigns.total_data', 'campaigns.status', 'campaigns.reference_table', 'campaigns.created_at'
+            )
+            ->selectRaw('
+                users.name AS created_by,
+                (SELECT COUNT(contacts.call_dial) FROM contacts WHERE contacts.campaign_id = campaigns.id AND contacts.call_dial IS NOT NULL) AS dialed_contacts
+            ')
+            ->leftjoin('users', 'campaigns.created_by', '=', 'users.id')
+            ->orderBy('campaigns.id', 'DESC')
+            ->paginate(15);
+
+        $rowNumber = $campaigns->firstItem();
+
+        return view('campaign.index', [
+            'campaigns' => $campaigns,
+            'row_number' => $rowNumber,
+        ]);
+    }
+    */
+
     public function create(Request $request)
     {
-        return view('campaign.create');
+        return view('campaign.create', array(
+            'templates' => $this->getTemplates(),
+        ));
     }
 
+    /*
     public function show(Request $request, $id)
     {
         $campaign = Campaign::select(
@@ -83,34 +125,162 @@ class CampaignController extends Controller
 
         return view('campaign.show', $data);
     }
+    */
+
+    public function show(Request $request, $id)
+    {
+        $campaign = Campaign::select(
+                'campaigns.id', 'campaigns.name', 'campaigns.total_data', 'campaigns.status', 'campaigns.created_at',
+                'campaigns.template_id', 'campaigns.reference_table'
+            )
+            ->where('campaigns.id', '=', $id)
+            ->whereNull('deleted_at')
+            ->first();
+        // dd($campaign);
+
+        $campaignInfo = DB::table($campaign->reference_table)
+            ->selectRaw("
+                SUM(" . $campaign->reference_table . ".total_calls) AS total_calls, 
+                (SELECT MIN(" . $campaign->reference_table . ".call_dial) FROM " . $campaign->reference_table . ") AS started,
+                (SELECT MAX(" . $campaign->reference_table . ".call_dial) FROM " . $campaign->reference_table . ") AS finished,
+                (SELECT COUNT(" . $campaign->reference_table . ".call_response) FROM " . $campaign->reference_table . " WHERE " . $campaign->reference_table . ".call_response = 'answered') AS success,
+                (SELECT COUNT(" . $campaign->reference_table . ".call_response) FROM " . $campaign->reference_table . " WHERE " . $campaign->reference_table . ".call_response = 'busy') AS busy,
+                (SELECT COUNT(" . $campaign->reference_table . ".call_response) FROM " . $campaign->reference_table . " WHERE " . $campaign->reference_table . ".call_response = 'no_answer') AS no_answer,
+                (SELECT COUNT(" . $campaign->reference_table . ".call_response) FROM " . $campaign->reference_table . " WHERE " . $campaign->reference_table . ".call_response = 'failed') AS failed,
+                (SELECT COUNT(" . $campaign->reference_table . ".id) FROM " . $campaign->reference_table . " WHERE " . $campaign->reference_table . ".call_dial IS NOT NULL) AS dialed_contacts
+            ")
+            ->get();
+        // dd($campaignInfo[0]);
+
+        $referenceTableColumns = Schema::getColumnListing($campaign->reference_table);
+        $templateHeaders = $this->getTemplateHeaders($campaign->template_id);
+        // $templateHeaders = array_intersect_key();
+        // dd($templateHeaders);
+
+        $contacts = DB::table($campaign->reference_table)->paginate(15);
+        $rowNumber = $contacts->firstItem();
+
+        $data = array(
+            'row_number' => $rowNumber,
+            'campaign' => $campaign,
+            'campaign_info' => $campaignInfo[0],
+            'template_headers' => $templateHeaders,
+            'columns' => $referenceTableColumns,
+            'contacts' => $contacts,
+        );
+        // dd($data);
+
+        return view('campaign.show', $data);
+    }
 
     public function edit(Request $request, $id)
     {
-        $data = array(
-            'row_number' => 0,
-            'campaign' => array(),
-            'contacts' => array(),
-        );
+        $data = array();
 
-        $campaignData = Campaign::select('campaigns.id', 'campaigns.name')
-            ->selectRaw('
-                COUNT(contacts.call_dial) AS dialed_contacts
-            ')
-            ->leftJoin('contacts', 'campaigns.id', '=', 'contacts.campaign_id')
-            ->whereNotNull('contacts.call_dial')
-            ->find($id);
+        if (session()->has('failed_contacts')) {
+            $data = array(
+                'name' => session('name'),
+                'failed_contacts' => session('failed_contacts'),
+            );
+            session()->forget('name');
+            session()->forget('key');
+            session()->forget('saved_contacts');
+            session()->forget('failed_contacts');
+            // dd($data);
+        }
+        else {
+            $data = array(
+                'row_number' => 0,
+                'campaign' => array(),
+                'contacts' => array(),
+                'templates' => $this->getTemplates(),
+            );
+    
+            $campaignData = Campaign::select(
+                    'campaigns.id AS camp_id', 'campaigns.name AS camp_name', 'campaigns.reference_table AS camp_reference_table',
+                    'campaigns.status AS camp_status', 'campaigns.template_id AS camp_templ_id', 'campaigns.text_voice AS camp_text_voice',
+                    'campaigns.voice_gender AS camp_voice_gender',
+                    'template_headers.name AS templ_header_name', 'template_headers.column_type AS templ_column_type',
+                    'template_headers.is_mandatory AS templ_is_mandatory', 'template_headers.is_unique AS templ_is_unique',
+                    'template_headers.is_voice AS templ_is_voice', 'template_headers.voice_position AS templ_voice_position'
+                )
+                ->leftJoin('template_headers', 'campaigns.template_id', '=', 'template_headers.template_id')
+                ->where('campaigns.id', $id)
+                ->whereNull('campaigns.deleted_at')
+                ->get();
+            // dd($campaignData);
+    
+            if ($campaignData->count() > 0) {
+                $tempHeaders = [];
+                $referenceTable = '';
+                foreach ($campaignData AS $keyCampaign => $valCampaign) {
+                    $tempHeaders[] = strtolower($valCampaign->templ_header_name);
+                    $referenceTable = $campaignData[$keyCampaign]->camp_reference_table;
+                }
+                
+                $contacts = DB::table($referenceTable)
+                    ->selectRaw(
+                        implode(', ', $tempHeaders) . ', ' .
+                        '(SELECT CAST(SUM(IF(call_dial IS NOT NULL, 1, 0)) AS INT) AS dialed_contacts FROM ' . $referenceTable . ') AS dialed_contacts '
+                        
+                    )
+                    ->orderBy('id', 'ASC')
+                    ->paginate(15);
+                // dd($contacts->toSql());
+                // dd($contacts);
+                
+                $data['row_number'] = $contacts->firstItem();
+                $data['campaign'] = $campaignData;
+                $data['contacts'] = $contacts;
+            }
+        }
+        // dd($data);
 
-        if ($campaignData) {
-            $contacts = Contact::where('contacts.campaign_id', '=', $campaignData->id)
-                ->paginate(15);
+        return view('campaign.edit', $data);
+    }
 
-            $data['row_number'] = $contacts->firstItem();
-            $data['campaign'] = $campaignData;
-            $data['contacts'] = $contacts;
+    /*
+    public function edit(Request $request, $id)
+    {
+        if (session()->has('failed_contacts')) {
+            $data = array(
+                'name' => session('name'),
+                'failed_contacts' => session('failed_contacts'),
+            );
+            session()->forget('name');
+            session()->forget('key');
+            session()->forget('saved_contacts');
+            session()->forget('failed_contacts');
+            // dd($data);
+        }
+        else {
+            $data = array(
+                'row_number' => 0,
+                'campaign' => array(),
+                'contacts' => array(),
+            );
+    
+            $campaignData = Campaign::select('campaigns.id', 'campaigns.name')
+                ->selectRaw('
+                    COUNT(contacts.call_dial) AS dialed_contacts
+                ')
+                ->leftJoin('contacts', 'campaigns.id', '=', 'contacts.campaign_id')
+                ->whereNotNull('contacts.call_dial')
+                ->find($id);
+    
+            if ($campaignData) {
+                $contacts = Contact::where('contacts.campaign_id', '=', $campaignData->id)
+                    ->paginate(15);
+    
+                $data['row_number'] = $contacts->firstItem();
+                $data['campaign'] = $campaignData;
+                $data['contacts'] = $contacts;
+            }
         }
 
         return view('campaign.edit', $data);
     }
+    */
 
     public function delete(Request $request, $id)
     {
@@ -143,9 +313,15 @@ class CampaignController extends Controller
 
     public function store(Request $request)
     {
+        // dd($request->input());
+
         $validator = Validator::make($request->input(), [
             'name' => 'required|string|min:5|max:30',
-            'input_campaign_rows' => 'required|string',
+            'select_campaign_template' => 'required|numeric|min:1',
+            'template_reference' => 'required|string|min:5|max:100',
+            'campaign_text_voice' => 'nullable|string',
+            'campaign_input_voice_gender' => 'nullable|string|min:10|max:15',
+            // 'input_campaign_rows' => 'required|string',
         ]);
 
         if ($validator->fails()) {
@@ -153,34 +329,125 @@ class CampaignController extends Controller
         }
 
         if (isset($request->input_campaign_rows)) {
-            $dataRows = json_decode($request->input_campaign_rows); // dd($dataRows);
-
+            $dataRows = json_decode($request->input_campaign_rows);
+            // dd($dataRows);
+            
             if (count($dataRows) > 0) {
-                $newContacts = [];
-                $existingContacts = [];
                 $todayDateTime = Carbon::now();
+                $reportHeaders = $this->getTemplateHeaders($request->select_campaign_template);
 
-                $campaignCreate = Campaign::create(array(
-                    'unique_key' => $todayDateTime->getTimestamp(),
-                    'name' => $request->name,
-                    'created_by' => Auth::user()->id,
-                ));
+                if ($reportHeaders->count() > 0) {
+                    // ---
+                    // --- create reference table and call-logs table
+                    // ---
+                    try {
+                        Schema::create($request->template_reference, function (Blueprint $table) use($reportHeaders) {
+                            $table->engine = 'MyISAM';
+                            $table->charset = 'utf8mb4';
+                            $table->collation = 'utf8mb4_unicode_ci';
+                
+                            $table->increments('id');
+                            $table->integer('contact_id')->unsigned()->nullable();
 
-                list($newContacts, $existingContacts) = $this->saveValidContacts($campaignCreate->id, $dataRows);
+                            foreach($reportHeaders AS $keyHeader => $valHeader) {
+                                $columnName = strtolower(preg_replace('/\W+/i', '_', $valHeader->name));
+                                $columnType = $valHeader->column_type;
 
-                $campaignCreate->total_data += count($newContacts);
-                $campaignCreate->save();
+                                switch ($columnType) {
+                                    case 'string':
+                                    case 'handphone': $columnType = 'string'; break;
+                                    case 'numeric': $columnType = 'integer'; break;
+                                    case 'datetime':
+                                    case 'date':
+                                    case 'time':
+                                        break;
+                                    default: break;
+                                }
 
-                if (empty($existingContacts)) {
-                    return redirect()->route('campaigns');
+                                if ($valHeader->is_mandatory && $valHeader->is_unique) {
+                                    $table->$columnType($columnName)->unique();
+                                }
+                                else if ($valHeader->is_mandatory) {
+                                    $table->$columnType($columnName);
+                                }
+                                else if($valHeader->is_unique) {
+                                    $table->$columnType($columnName)->unique()->nullable();
+                                }
+                                else {
+                                    $table->$columnType($columnName)->nullable();
+                                }
+
+                                $reportHeaders[$keyHeader]->name = $columnName;
+                            }
+                            
+                            $table->integer('extension')->unsigned()->nullable();
+                            $table->string('callerid')->nullable();
+                            $table->string('voice')->nullable();
+                            $table->tinyInteger('total_calls')->unsigned()->nullable();
+                            $table->datetime('call_dial')->index()->nullable();
+                            $table->string('call_response', 15)->index()->nullable()->comment('answered, no_answer, busy, failed');
+                            $table->timestamps();
+                        });
+
+                        Schema::create($request->template_reference . '_call_logs', function (Blueprint $table) {
+                            $table->engine = 'MyISAM';
+                            $table->charset = 'utf8mb4';
+                            $table->collation = 'utf8mb4_unicode_ci';
+                            
+                            $table->increments('id');
+                            $table->integer('contact_id')->unsigned();
+                            $table->datetime('call_dial')->nullable();
+                            $table->datetime('call_connect')->nullable();
+                            $table->datetime('call_disconnect')->nullable();
+                            $table->integer('call_duration')->default(0)->nullable();
+                            $table->string('call_recording', 255)->nullable();
+                            $table->string('call_response', 15)->index()->nullable()->comment('answered, no_answer, busy, failed');
+                            $table->timestamps();
+                        });
+
+                        $campaignCreate = Campaign::create(array(
+                            'unique_key' => $todayDateTime->getTimestamp(),
+                            'name' => $request->name,
+                            'created_by' => Auth::user()->id,
+                            'template_id' => $request->select_campaign_template,
+                            'reference_table' => $request->template_reference,
+                            'text_voice' => trim($request->campaign_text_voice),
+                            'voice_gender' => $request->campaign_input_voice_gender,
+                        ));
+
+                        list($newContacts, $existingContacts) = $this->saveValidContacts(
+                            $campaignCreate->id,
+                            $dataRows,
+                            $request->template_reference,
+                            $reportHeaders
+                        );
+
+                        $campaignCreate->total_data += count($dataRows) - count($existingContacts);
+                        $campaignCreate->save();
+
+                        if (count($existingContacts) <= 0) {
+                            return redirect()->route('campaigns');
+                        }
+                        else {
+                            return redirect()->route('campaigns.edit', ['id' => $campaignCreate->id])->with([
+                                'name' => $campaignCreate->name,
+                                'saved_contacts' => json_encode($newContacts),
+                                'failed_contacts' => json_encode($existingContacts)
+                            ]);
+                        }
+                        
+                    } catch (\Illuminate\Database\QueryException $ex) {
+                        // dd($ex);
+                        $validator->errors()->add(
+                            'campaign_referense_exists',
+                            'Campaign Name with selected Campaign Template already exists.
+                        ');
+                        return back()->withErrors($validator)->withInput();
+                    }
                 }
                 else {
-                    return back()->with([
-                        'name' => $campaignCreate->name,
-                        'key' => $campaignCreate->unique_key,
-                        'saved_contacts' => json_encode($newContacts),
-                        'failed_contacts' => json_encode($existingContacts)
-                    ]);
+                    $validator->errors()->add('no_template_headers', 'Selected template doesn\'t have headers.');
+                    return back()->withErrors($validator)->withInput();
                 }
             }
             else {
@@ -191,83 +458,317 @@ class CampaignController extends Controller
             return back();
         }
     }
-    
+
     public function update(Request $request)
     {
+        // dd($request->input());
         $validator = Validator::make($request->input(), [
-            'name' => 'required|string|min:5|max:30',
-            'rows' => 'nullable|string',
-            'action' => 'nullable|string|max:8',
-            'campaign' => 'required|string|max:15',
+            'campaign' => 'required|numeric|min:1|max:' . Campaign::max('id'),
+            'campaign_name' => 'required|string|min:5|max:100',
+            'select_campaign_template' => 'required|numeric|min:1|max:' . Template::max('id'),
+            'campaign_voice_gender' => 'required|string|min:10|max:15',
+
+            'campaign_edit_action' => 'nullable|string|min:5|max:8',
+            'campaign_text_voice' => 'nullable|string',
+            'template_reference' => 'nullable|string|min:25|max:25',
+            'contact_rows' => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
             return back()->withErrors($validator)->withInput();
         }
 
-        $campaign = Campaign::
-            where(function($q) {
-                $q->where('status', '=', 0)
-                  ->orWhere('status', '=', 2);
-            })
-            ->find($request->campaign);
+        // $request->campaign = 1; // for testing n debugging
+        $campaignAndHeaders = Campaign::select(
+                'campaigns.id AS camp_id', 'campaigns.name AS camp_name', 'campaigns.unique_key AS camp_unique_key', 'campaigns.total_data AS camp_total_data',
+                'campaigns.template_id AS camp_templ_id', 'campaigns.reference_table AS camp_reference_table',
+                'template_headers.name AS templ_name', 'template_headers.column_type AS templ_column_type'
+            )
+            ->leftJoin('template_headers', 'campaigns.template_id', '=', 'template_headers.template_id')
+            ->where('campaigns.id', $request->campaign)
+            ->where('campaigns.status', '=', 0)
+            ->whereNull('template_headers.deleted_at')
+            ->get();
+        // dd($campaign);
+        
 
-        if ($campaign) {
-            $countCallLogs = CallLog::where('contacts.campaign_id', '=', $campaign->id)
-                ->leftJoin('contacts', 'call_logs.contact_id', '=', 'contacts.id')
-                ->count('call_logs.contact_id');
+        if ($campaignAndHeaders->count() > 0) {
+            $newContacts = [];
+            $existingContacts = [];
 
-            if ($countCallLogs == 0) {
-                $existingContacts = [];
-                $dataRows = json_decode($request->rows); // dd($dataRows);
-                $newContacts = [];
-                $existingContacts = [];
-    
-                if ($request->action && (count($dataRows) > 0)) {
-                    if ($request->action === 'replace') {
-                        Contact::where('campaign_id', '=', $campaign->id)
-                            ->delete();
-                        $campaign->total_data = 0;
+            $campaign = $campaignAndHeaders[0];
+            $dataRows = json_decode($request->contact_rows); // dd($dataRows);
+            $totalContactRows = count($dataRows);
+            $reportHeaders = $this->getTemplateHeaders($request->select_campaign_template, true); // dd($reportHeaders);
+            $postedTemplateReference = strtolower(trim($request->template_reference));
+            
+            // ---
+            // --- check for template change if any
+            // --- and create the new necessary contacts and call-logs table
+            // ---
+            if ($campaign->camp_templ_id != $request->select_campaign_template) {
+                if ($reportHeaders->count() > 0) {
+                    try {
+                        Schema::dropIfExists($campaign->camp_reference_table);
+                        Schema::dropIfExists($campaign->camp_reference_table . '_call_logs');
+
+                        Schema::create($postedTemplateReference, function (Blueprint $table) use($reportHeaders) {
+                            // $table->engine = 'MyISAM';
+                            $table->charset = 'utf8mb4';
+                            $table->collation = 'utf8mb4_unicode_ci';
+
+                            $table->increments('id');
+                            $table->integer('contact_id')->unsigned()->nullable();
+
+                            foreach($reportHeaders AS $keyHeader => $valHeader) {
+                                $columnName = strtolower(preg_replace('/\W+/i', '_', $valHeader->name));
+                                $columnType = $valHeader->column_type;
+
+                                switch ($columnType) {
+                                    case 'string':
+                                    case 'handphone': $columnType = 'string'; break;
+                                    case 'numeric': $columnType = 'integer'; break;
+                                    case 'datetime':
+                                    case 'date':
+                                    case 'time':
+                                        break;
+                                    default: break;
+                                }
+
+                                if ($valHeader->is_mandatory && $valHeader->is_unique) {
+                                    $table->$columnType($columnName)->unique();
+                                }
+                                else if ($valHeader->is_mandatory) {
+                                    $table->$columnType($columnName);
+                                }
+                                else if($valHeader->is_unique) {
+                                    $table->$columnType($columnName)->unique()->nullable();
+                                }
+                                else {
+                                    $table->$columnType($columnName)->nullable();
+                                }
+
+                                $reportHeaders[$keyHeader]->name = $columnName;
+                            }
+
+                            $table->integer('extension')->unsigned()->nullable();
+                            $table->string('callerid')->nullable();
+                            $table->string('voice')->nullable();
+                            $table->tinyInteger('total_calls')->unsigned()->nullable();
+                            $table->datetime('call_dial')->index()->nullable();
+                            $table->string('call_response', 15)->index()->nullable()->comment('answered, no_answer, busy, failed');
+                            $table->timestamps();
+                        });
+
+                        Schema::create($postedTemplateReference . '_call_logs', function (Blueprint $table) {
+                            $table->engine = 'MyISAM';
+                            $table->charset = 'utf8mb4';
+                            $table->collation = 'utf8mb4_unicode_ci';
+                            
+                            $table->increments('id');
+                            $table->integer('contact_id')->unsigned();
+                            $table->datetime('call_dial')->nullable();
+                            $table->datetime('call_connect')->nullable();
+                            $table->datetime('call_disconnect')->nullable();
+                            $table->integer('call_duration')->default(0)->nullable();
+                            $table->string('call_recording', 255)->nullable();
+                            $table->string('call_response', 15)->index()->nullable()->comment('answered, no_answer, busy, failed');
+                            $table->timestamps();
+                        });
+
+                        $campaign->camp_reference_table = $postedTemplateReference;
+
+                    } catch (\Illuminate\Database\QueryException $ex) {
+                        dd($ex);
+                        $validator->errors()->add(
+                            'campaign_referense_exists',
+                            'Campaign Name with selected Campaign Template already exists.
+                        ');
+                        return back()->withErrors($validator)->withInput();
                     }
-    
-                    list($newContacts, $existingContacts) = $this->saveValidContacts($campaign->id, $dataRows);
-                    $campaign->total_data += count($newContacts);
-                }
-
-                $campaign->name = $request->name;
-                $campaign->save();
-
-                if (empty($existingContacts)) {
-                    return redirect()->route('campaigns');
                 }
                 else {
                     return back()->with([
-                        'name' => $campaign->name,
-                        'key' => $campaign->unique_key,
-                        'saved_contacts' => json_encode($newContacts),
-                        'failed_contacts' => json_encode($existingContacts)
+                        'name' => $campaign->camp_name,
+                        'key' => $campaign->camp_unique_key,
+                        'template_not_exists' => 'This template does not exist.',
                     ]);
                 }
             }
+
+            // ---
+            // --- check for campaign's name change if any
+            // --- and change the related contacts and call-logs table's name
+            // ---
+            if ($campaign->camp_reference_table !== $postedTemplateReference) {
+                Schema::rename($campaign->camp_reference_table, $postedTemplateReference);
+                Schema::rename($campaign->camp_reference_table . '_call_logs', $postedTemplateReference . '_call_logs');
+            }
+
+            // ---
+            // --- check for data action change
+            // ---
+            if ($request->campaign_edit_action) {
+                // ---
+                // --- check if data action is 'replace'
+                // ---
+                if ($request->campaign_edit_action === 'replace') {
+                    DB::table($postedTemplateReference)->truncate();
+                    DB::table($postedTemplateReference . '_call_logs')->truncate();
+                    $campaign->camp_total_data = 0;
+                }
+                
+                // ---
+                // --- check if there's new contact list
+                // ---
+                if (count($dataRows) > 0) {
+                    list($newContacts, $existingContacts) = $this->saveValidContacts(
+                        $campaign->camp_id,
+                        $dataRows,
+                        $postedTemplateReference,
+                        $reportHeaders
+                    );
+                    // dd(count($newContacts));
+                    // dd($existingContacts);
+                }
+            }
+            
+            // ---
+            // --- process the update
+            // ---
+            Campaign::where('id', $campaign->camp_id)
+                ->whereNull('deleted_at')
+                ->update([
+                    'name' => $request->campaign_name,
+                    'total_data' => $campaign->camp_total_data + count($newContacts),
+                    'template_id' => $request->select_campaign_template,
+                    'reference_table' => $postedTemplateReference,
+                    'text_voice' => trim($request->campaign_text_voice),
+                    'voice_gender' => $request->campaign_voice_gender,
+                ]);
+            // dd('samape sini');
+            
+            //
+            // --- redirects
+            // ---
+            if (empty($existingContacts)) {
+                return redirect()->route('campaigns');
+            }
             else {
-                return back()->with([
+                $campaignFailedContact = Campaign::select(
+                        'campaigns.id AS camp_id', 'campaigns.name AS camp_name', 'campaigns.unique_key AS camp_unique_key',
+                        'campaigns.total_data AS camp_total_data',
+                        'campaigns.template_id AS camp_templ_id', 'campaigns.reference_table AS camp_reference_table',
+                        'template_headers.name AS templ_name', 'template_headers.column_type AS templ_column_type',
+                        'template_headers.is_mandatory AS templ_is_mandatory', 'template_headers.is_unique AS templ_is_unique',
+                        'template_headers.is_voice AS templ_is_voice', 'template_headers.voice_position AS templ_voice_position'
+                    )
+                    ->leftJoin('template_headers', 'campaigns.template_id', '=', 'template_headers.template_id')
+                    ->where('campaigns.id', $request->campaign)
+                    ->where('campaigns.status', '=', 0)
+                    ->whereNull('template_headers.deleted_at')
+                    ->get();
+                // dd($campaignFailedContact);
+                
+                $returnedData = [
+                    'campaign_failed_contacts' => $campaignFailedContact,
+                    'saved_contacts' => json_encode($newContacts),
+                    'failed_contacts' => json_encode($existingContacts),
+                ];
+                // dd($returnedData);
+                
+                return back()->with($returnedData);
+            }
+        }
+        else {
+            // dd('sampe sini');
+            return back()->with([
+                'name' => $campaign->name,
+                'key' => $campaign->unique_key,
+                'already_running' => 'This campaign does not exists or is being or has been processed.',
+            ]);
+        }
+    }
+    
+    /*
+    public function update(Request $request)
+    {
+        // dd($request->input());
+        $validator = Validator::make($request->input(), [
+            'campaign_name' => 'required|string|min:5|max:30',
+            'rows' => 'nullable|string',
+            'campaign_edit_action' => 'nullable|string|max:8',
+            'campaign' => 'required|numeric',
+        ]);
+
+        if ($validator->fails()) {
+            return back()->withErrors($validator)->withInput();
+        }
+
+        // $request->campaign = 1; // for testing n debugging
+        $campaign = Campaign::select('campaigns.id')
+            ->selectRaw('
+                CAST(
+                    SUM(
+                        IF(contacts.total_calls IS NOT NULL, contacts.total_calls, 0)
+                    )
+                    AS UNSIGNED
+                ) AS total_calls'
+            )
+            ->where(function($q) {
+                $q->where('campaigns.status', '=', 0)
+                  ->orWhere('campaigns.status', '=', 2);
+            })
+            ->leftJoin('contacts', 'campaigns.id', '=', 'contacts.campaign_id')
+            ->find($request->campaign);
+        // dd($campaign);
+
+        if ($campaign->id && ($campaign->total_calls == 0)) {
+            $dataRows = json_decode($request->rows); // dd($dataRows);
+            $newContacts = [];
+            $existingContacts = [];
+            $totalContactRows = count($dataRows);
+
+            if ($request->campaign_edit_action && ($totalContactRows > 0)) {
+                if ($request->campaign_edit_action === 'replace') {
+                    Contact::where('campaign_id', '=', $campaign->id)->delete();
+                    $campaign->total_data = 0;
+                }
+
+                list($newContacts, $existingContacts) = $this->saveValidContacts($campaign->id, $dataRows);
+                // $campaign->total_data += count($newContacts);
+                $campaign->total_data += ($totalContactRows - count($existingContacts));
+            }
+
+            $campaign->name = $request->campaign_name;
+            $campaign->save();
+
+            if (empty($existingContacts)) {
+                return redirect()->route('campaigns');
+            }
+            else {
+                return redirect()->route('campaigns.edit', ['id' => $campaign->id])->with([
                     'name' => $campaign->name,
-                    'key' => $campaign->unique_key,
-                    'already_running' => 'This campaign already run',
+                    'saved_contacts' => json_encode($newContacts),
+                    'failed_contacts' => json_encode($existingContacts),
                 ]);
             }
         }
         else {
-            return back();
+            return back()->with([
+                'name' => $campaign->name,
+                'key' => $campaign->unique_key,
+                'already_running' => 'This campaign does not exists or already run once.',
+            ]);
         }
     }
+    */
 
     public function destroy(Request $request)
     {
         $campaign = Campaign::find($request->campaign);
 
         if ($campaign) {
-            // Contact::where('campaign_id', '=', $campaign->id)->delete();
             $campaign->delete();
         }
 
@@ -284,7 +785,7 @@ class CampaignController extends Controller
         );
 
         $validator = Validator::make($request->input(), [
-            'campaign' => 'required|numeric',
+            'campaign' => 'required|numeric|min:1|max:' . Campaign::max('id'),
             'currstatus' => 'required|numeric|min:0|max:3',
         ]);
 
@@ -323,86 +824,122 @@ class CampaignController extends Controller
 
     public function exportData(Request $request)
     {
-        $campaign = Campaign::select(
-                'campaigns.id', 'campaigns.name', 'campaigns.total_data', 'campaigns.status', 'campaigns.created_at'
-            )
-            ->selectRaw("
-                SUM(contacts.total_calls) AS total_calls, 
-                (SELECT MIN(contacts.call_dial) FROM contacts WHERE contacts.campaign_id = campaigns.id) AS started,
-                (SELECT MAX(contacts.call_dial) FROM contacts WHERE contacts.campaign_id = campaigns.id) AS finished,
-                (SELECT COUNT(contacts.call_response) FROM contacts WHERE contacts.campaign_id = campaigns.id AND contacts.call_response = 'answered') AS success,
-                (SELECT COUNT(contacts.call_response) FROM contacts WHERE contacts.campaign_id = campaigns.id AND contacts.call_response = 'failed') AS failed,
-                (SELECT COUNT(contacts.id) FROM contacts WHERE contacts.campaign_id = campaigns.id AND contacts.call_dial IS NOT NULL) AS dialed_contacts
-            ")
-            ->leftJoin('contacts', 'campaigns.id', '=', 'contacts.campaign_id')
-            ->where('campaigns.id', '=', $request->campaign)
-            ->first();
-            
-        $contacts = array();
-        $data = array(
-            'campaign' => $campaign,
-            'contacts' => $contacts,
-        );
+        // dd($request->input());
 
-        if ($campaign) {
-            $contacts = Contact::select(
-                    'contacts.id',
-                    'contacts.account_id',
-                    'contacts.name',
-                    'contacts.phone',
-                    'contacts.bill_date',
-                    'contacts.due_date',
-                    'contacts.total_calls',
-                    'contacts.nominal',
-                    'contacts.call_dial',
-                    'contacts.call_response'
-                )
-                ->where('contacts.campaign_id', '=', $campaign->id)
-                ->get();
-                
-            $data['contacts'] = $contacts;
-            // dd($data);
+        $contacts = array();
+        $campaign = TemplateHeader::select(
+                'template_headers.name AS header_name', 'template_headers.column_type AS header_type',
+                'campaigns.id AS camp_id', 'campaigns.unique_key AS camp_unique_key', 'campaigns.name AS camp_name', 'campaigns.total_data AS camp_total_data',
+                'campaigns.status AS camp_status', 'campaigns.created_at AS camp_created_at', 'campaigns.reference_table AS camp_reference_table'
+            )
+            ->leftJoin('campaigns', 'template_headers.template_id', '=', 'campaigns.template_id')
+            ->where('campaigns.id', '=', $request->campaign)
+            ->whereNull('campaigns.deleted_at')
+            ->get();
+        // dd($campaign);
+            
+        if ($campaign->count() > 0) {
+            $campaignInfo = DB::table($campaign[0]->camp_reference_table)
+                ->selectRaw("
+                    SUM(" . $campaign[0]->camp_reference_table . ".total_calls) AS total_calls, 
+                    (SELECT MIN(" . $campaign[0]->camp_reference_table . ".call_dial) FROM " . $campaign[0]->camp_reference_table . ") AS started,
+                    (SELECT MAX(" . $campaign[0]->camp_reference_table . ".call_dial) FROM " . $campaign[0]->camp_reference_table . ") AS finished,
+                    (SELECT COUNT(" . $campaign[0]->camp_reference_table . ".call_response) FROM " . $campaign[0]->camp_reference_table . " WHERE " . $campaign[0]->camp_reference_table . ".call_response = 'answered') AS success,
+                    (SELECT COUNT(" . $campaign[0]->camp_reference_table . ".call_response) FROM " . $campaign[0]->camp_reference_table . " WHERE " . $campaign[0]->camp_reference_table . ".call_response = 'busy') AS busy,
+                    (SELECT COUNT(" . $campaign[0]->camp_reference_table . ".call_response) FROM " . $campaign[0]->camp_reference_table . " WHERE " . $campaign[0]->camp_reference_table . ".call_response = 'no_answer') AS no_answer,
+                    (SELECT COUNT(" . $campaign[0]->camp_reference_table . ".call_response) FROM " . $campaign[0]->camp_reference_table . " WHERE " . $campaign[0]->camp_reference_table . ".call_response = 'failed') AS failed,
+                    (SELECT COUNT(" . $campaign[0]->camp_reference_table . ".id) FROM " . $campaign[0]->camp_reference_table . " WHERE " . $campaign[0]->camp_reference_table . ".call_dial IS NOT NULL) AS dialed_contacts
+                ")
+                ->first();
+            // dd($campaignInfo);
+
+            $progress = number_format(($campaignInfo->dialed_contacts / $campaign[0]->camp_total_data) * 100, 2, '.', ',');
+            $contacts = DB::table($campaign[0]->camp_reference_table)->get();
+            // dd($contacts);
 
             $fileName = 'IVR_BLAST-'
-                . $campaign->unique_key
-                . '-' . strtoupper(Str::replaceFirst(' ', '_', $campaign->name))
+                . $campaign[0]->camp_unique_key
+                . '-' . strtoupper(Str::replaceFirst(' ', '_', $campaign[0]->camp_name))
                 . '-' . Carbon::now('Asia/Jakarta')->format('Ymd_His');
             
             if ($request->export_type === 'pdf') {
                 $pdf = App::make('dompdf.wrapper');
-                $pdf->loadView('campaign.show_pdf', $data);
+                $pdf->loadView('campaign.show_pdf', [
+                    'campaign' => $campaign,
+                    'contacts' => $contacts,
+                    'campaignInfo' => $campaignInfo,
+                    'progress' => $progress
+                ]);
                 return $pdf->download($fileName . '.pdf');
             }
             else if ($request->export_type === 'excel') {
                 $excelDownload = storage_path('app/public/files/Report_IVR_Blast.xlsx');
                 
-                Excel::load($excelDownload, function($file) use($campaign, $contacts, $excelDownload) {
-                    $progress = number_format(($campaign->dialed_contacts / $campaign->total_data) * 100, 2, '.', ',');
+                Excel::load($excelDownload, function($file) use($campaign, $contacts, $campaignInfo, $progress) {
+                    switch ($campaign[0]->camp_status) {
+                        case 0: $campaign[0]->camp_status = 'Ready'; break;
+                        case 1: $campaign[0]->camp_status = 'Running'; break;
+                        case 2: $campaign[0]->camp_status = 'Paused'; break;
+                        case 3: $campaign[0]->camp_status = 'Finished'; break;
+                        default: break;
+                    }
 
                     $sheet = $file->setActiveSheetIndex(0);
-                    $sheet->setCellValue('A2', $campaign->name);
-                    $sheet->setCellValue('E2', $campaign->started ? date('d/m/Y - H:i', strtotime($campaign->started)) : '-');
-                    $sheet->setCellValue('A5', $campaign->total_data);
-                    $sheet->setCellValue('E5', ($campaign->finished != '-') ? date('d/m/Y - H:i', strtotime($campaign->finished)) : '-');
-                    $sheet->setCellValue('A8', $campaign->status);
-                    $sheet->setCellValue('E8', $campaign->total_calls);
-                    $sheet->setCellValue('A11', date('d/m/Y - H:i', strtotime($campaign->created_at)));
-                    $sheet->setCellValue('E11', $campaign->success);
+                    $sheet->setCellValue('A2', $campaign[0]->camp_name);
+                    $sheet->setCellValue('E2', $campaignInfo->started ? date('d/m/Y - H:i', strtotime($campaignInfo->started)) : '-');
+                    $sheet->setCellValue('A5', $campaign[0]->camp_total_data);
+                    $sheet->setCellValue('E5', ($campaignInfo->finished != '-') ? date('d/m/Y - H:i', strtotime($campaignInfo->finished)) : '-');
+                    $sheet->setCellValue('A8', $campaign[0]->camp_status);
+                    $sheet->setCellValue('E8', $campaignInfo->total_calls);
+                    $sheet->setCellValue('A11', date('d/m/Y - H:i', strtotime($campaign[0]->camp_created_at)));
+                    $sheet->setCellValue('E11', $campaignInfo->success);
                     $sheet->setCellValue('A14', $progress);
-                    $sheet->setCellValue('E14', $campaign->failed);
+                    $sheet->setCellValue('E14', $campaignInfo->failed);
+
+                    // --
+                    // -- populate table title
+                    // --
+                    if ($campaign->count() > 0) {
+                        foreach($campaign AS $keyHeader => $valHeader) {
+                            // $theCell = $sheet->getCellByColumnAndRow((0 + $keyHeader), 16);
+                            // $theCell->setFontWeight('bold');
+                            // $theCell->setBorder('solid', 'solid', 'solid', 'solid');
+                            $sheet->setCellValueByColumnAndRow((0 + $keyHeader), 16, strtoupper($valHeader->header_name));
+                        }
+
+                        // $theCell = $sheet->getCellByColumnAndRow($campaign->count(), 16);
+                        // $theCell->setValue('CALL_DATE');
+
+                        $sheet->setCellValueByColumnAndRow($campaign->count(), 16, 'CALL_DATE');
+                        $sheet->setCellValueByColumnAndRow($campaign->count() + 1, 16, 'CALL_RESPONSE');
+                        $sheet->setCellValueByColumnAndRow($campaign->count() + 2, 16, 'TOTAL_CALLS');
+                    }
 
                     $excelRowNumber = 17;
+                    $headerName = '';
                     foreach ($contacts->chunk(100) as $chunks) {
                         foreach ($chunks as $valueContact) {
-                            $sheet->setCellValue('A' . $excelRowNumber, (string) $valueContact['account_id']);
-                            $sheet->setCellValue('B' . $excelRowNumber, $valueContact['name']);
-                            $sheet->setCellValue('C' . $excelRowNumber, $valueContact['phone']);
-                            $sheet->setCellValue('D' . $excelRowNumber, $valueContact['bill_date']);
-                            $sheet->setCellValue('E' . $excelRowNumber, $valueContact['due_date']);
-                            $sheet->setCellValue('F' . $excelRowNumber, $valueContact['nominal']);
-                            $sheet->setCellValue('G' . $excelRowNumber, $valueContact['total_calls']);
-                            $sheet->setCellValue('H' . $excelRowNumber, $valueContact['call_dial']);
-                            $sheet->setCellValue('I' . $excelRowNumber, strtoupper($valueContact['call_response']));
+                            foreach($campaign AS $keyHeader => $valHeader) {
+                                $headerName = strtolower($valHeader->header_name);
+
+                                switch ($valHeader->header_type) {
+                                    case 'handphone':
+                                        $sheet->setCellValueByColumnAndRow(
+                                            (0 + $keyHeader),
+                                            $excelRowNumber,
+                                            substr($valueContact->$headerName, 0, 4) . 'xxxxxx' . substr($valueContact->$headerName, strlen($valueContact->$headerName) - 3)
+                                        );
+                                        break;
+                                    default:
+                                        $sheet->setCellValueByColumnAndRow((0 + $keyHeader), $excelRowNumber, $valueContact->$headerName);
+                                        break;
+                                }
+                            }
+
+                            $sheet->setCellValueByColumnAndRow($campaign->count(), $excelRowNumber, $valueContact->call_dial ? $valueContact->call_dial : '');
+                            $sheet->setCellValueByColumnAndRow($campaign->count() + 1, $excelRowNumber, $valueContact->call_response ? $valueContact->call_response : '');
+                            $sheet->setCellValueByColumnAndRow($campaign->count() + 2, $excelRowNumber, $valueContact->total_calls ? $valueContact->total_calls : 0);
+
                             $excelRowNumber++;
                         }
                     }
@@ -415,12 +952,49 @@ class CampaignController extends Controller
         }
     }
 
+    /*
     public function downloadTemplate()
     {
         $fileTemplate = public_path('files/Template_IVR_Blast.xlsx');
         return response()->download($fileTemplate);
     }
-    
+    */
+
+    public function downloadTemplate($templateId)
+    {
+        $fileTemplate = storage_path('app/public/files/Template_IVR_Blast.xlsx');
+
+        Excel::load($fileTemplate, function($file) use ($templateId) {
+            if ($templateId > 0) {
+                $sheet = $file->setActiveSheetIndex(0);
+                $sheet->removeRow(5, 9);
+                $sheet->removeColumn('A', 5);
+                $sheet->setCellValue('A2', null);
+                // $sheet->getProtection()->setSheet(true);
+
+                $reportHeaders = $this->getTemplateHeaders($templateId);
+                foreach($reportHeaders AS $keyHeader => $valHeader) {
+                    $tempColumnTitle = strtoupper($valHeader->name);
+                    $columnOptions = [];
+
+                    if ($valHeader->is_mandatory === 1) { $columnOptions[] = 'mandatory'; }
+                    if ($valHeader->is_unique === 1) { $columnOptions[] = 'unique'; }
+                    if ($valHeader->is_voice === 1) { $columnOptions[] = 'voice-' . $valHeader->voice_position; }
+
+                    if (count($columnOptions) > 0) {
+                        $tempColumnTitle .= ' (' . implode(', ', $columnOptions) . ')';
+                    }
+
+                    $sheet->setCellValueByColumnAndRow($keyHeader, 1, $tempColumnTitle);
+                    // $sheet->getStyleByColumnAndRow($keyHeader, 1)->getProtection()->setLocked(\PHPExcel_Style_Protection::PROTECTION_PROTECTED);
+                }
+                // $sheet->getStyle('A2:XFD100000')->getProtection()->setLocked(\PHPExcel_Style_Protection::PROTECTION_UNPROTECTED);
+            }
+        })->download('xlsx');
+    }
+
+
+    /*
     public function exportFailedContacts(Request $request)
     {
         $validate = Validator::make($request->input(), [
@@ -459,90 +1033,395 @@ class CampaignController extends Controller
             });
         })->export('xlsx');
     }
+    */
+    
+    public function exportFailedContacts(Request $request)
+    {
+        $validate = Validator::make($request->input(), [
+            'failed_contacts_campaign' => 'required|numeric|min:1|max:' . Campaign::max('id'),
+            'campaign_failed_contacts' => 'required|string',
+            'campaign_failed_contacts_headers' => 'required|string'
+        ]);
 
+        if ($validate->fails()) {
+            return back();
+        }
+
+        $failedContacts = json_decode($request->campaign_failed_contacts);
+        $templateHeaders = json_decode($request->campaign_failed_contacts_headers);
+        $contacts = [];
+
+        foreach($failedContacts AS $keyFailedContact => $valueFailedContact) {
+            $contacts[] = array(
+                'ACCOUNT_ID' => $valueFailedContact->account_id,
+                'NAME' => $valueFailedContact->name,
+                'PHONE' => $valueFailedContact->phone,
+                'BILL_DATE' => $valueFailedContact->bill_date,
+                'DUE_DATE' => $valueFailedContact->due_date,
+                'NOMINAL' => $valueFailedContact->nominal,
+                'FAILED_REASON' => $valueFailedContact->failed,
+            );
+        }
+
+        $fileName = 'IVR_BLAST_FAILED_UPLOAD-'
+        . $request->input_key
+        . '-' . strtoupper(Str::replaceFirst(' ', '_', $request->input_name))
+        . '-' . Carbon::now('Asia/Jakarta')->format('Ymd_His');
+
+        Excel::create($fileName, function($excel) use($contacts) {
+            $excel->sheet('contacts', function($sheet) use($contacts) {
+                $sheet->fromArray($contacts);
+            });
+        })->export('xlsx');
+    }
+
+    public function importProgress(Request $request)
+    {
+        $totalContacts = count(self::$totalContactRows);
+        $newContactsCount = count(self::$newContacts);
+        $existingContactsCount = count(self::$existingContacts);
+
+        // $totalContacts = $this->totalContactRows;
+        // $newContactsCount = count($this->newContacts);
+        // $existingContactsCount = count($this->existingContacts);
+
+        $isFinished = true;
+        $progress = 0;
+        // dd($totalContacts . ' - ' . $newContactsCount . ' - ' . $existingContactsCount);
+
+        if (($totalContacts > 0) && (($newContactsCount > 0) || ($existingContactsCount > 0))) {
+            $isFinished = ($newContactsCount + $existingContactsCount) != $totalContacts ? false : true;
+            $progress = (($newContactsCount + $existingContactsCount) / $totalContacts) * 100;
+        }
+
+        $returnedData = json_encode([
+            'is_finished' => $isFinished,
+            'new_contacts' => $newContactsCount,
+            'existing_contacts' => $existingContactsCount,
+            'progress' => $progress,
+        ]);
+
+        header('Content-Type: text/event-stream');
+        header('Cache-Control: no-cache');
+        echo "data: {$returnedData}\n\nretry:1000\n\n";
+        flush();
+    }
+
+    /*
     private function saveValidContacts($campaignId, $dataRows)
     {
+        dd($dataRows);
+
+        ini_set('max_execution_time', 0);
+
         $newContacts = [];
         $existingContacts = [];
-        $tempContact = [];
 
         // -- connection with sip
-        $sip = DB::connection('sip')
-                ->table('sip')
-                ->selectRaw('DISTINCT(id) as extension, data as callerid')
-                ->where('keyword', 'callerid')
-                ->where('id', 'like', env('SIP_PREFIX_EXT').'%')
-                ->orderBy(DB::raw('RAND()'))
-                ->get();
-
+        // $sip = DB::connection('sip')
+        //         ->table('sip')
+        //         ->selectRaw('DISTINCT(id) as extension, data as callerid')
+        //         ->where('keyword', 'callerid')
+        //         ->where('id', 'like', env('SIP_PREFIX_EXT').'%')
+        //         ->orderBy(DB::raw('RAND()'))
+        //         ->get();
+        // $sipIdxCount = $sip->count() - 1;
+        // $rand = 0;
 
         foreach ($dataRows AS $keyDataRows => $valueDataRows) {
-            $tempContact['campaign_id'] = $campaignId;
-            $tempContact['account_id'] = $valueDataRows->account_id;
+            $tempContact = [
+                'campaign_id' => $campaignId,
+                'account_id' => trim(preg_replace('/\s/', '', $valueDataRows->account_id)),
+                'name' => $valueDataRows->name,
+                'phone' => trim(preg_replace('/\D/', '', $valueDataRows->phone)),
+                'bill_date' => $valueDataRows->bill_date,
+                'due_date' => $valueDataRows->due_date,
+                'nominal' => $valueDataRows->nominal,
+            ];
 
-            $isExists = Contact::where('campaign_id', '=', $tempContact['campaign_id'])
-                ->where('account_id', '=', trim($tempContact['account_id']))
-                ->exists();
+            // -- connection with sip
+            // $rand = rand(0, sipIdxCount);
+            // $tempContact['extension']   = $sip[$rand]->extension;
+            // $tempContact['callerid']    = $sip[$rand]->callerid;
+            // $tempContact['voice']       = Helpers::generateVoice([
+            //     'bill_date' => $valueDataRows->bill_date,
+            //     'due_date' => $valueDataRows->due_date,
+            //     'nominal' => $valueDataRows->nominal
+            // ]);
 
-            if (!$isExists) {
-                $tempContact['name'] = $valueDataRows->name;
-                $tempContact['phone'] = trim(preg_replace('/\D/', '', $valueDataRows->phone));
-                $tempContact['bill_date'] = $valueDataRows->bill_date;
-                $tempContact['due_date'] = $valueDataRows->due_date;
-                $tempContact['nominal'] = $valueDataRows->nominal;
+            $first8Position = stripos($tempContact['phone'], '8', 0);
 
-                // -- connection with sip
-                $rand = rand(0,($sip->count()-1));
-                $tempContact['extension']   = $sip[$rand]->extension;
-                $tempContact['callerid']    = $sip[$rand]->callerid;
-                $tempContact['voice']       = Helpers::generateVoice([
-                    'bill_date' => $valueDataRows->bill_date,
-                    'due_date' => $valueDataRows->due_date,
-                    'nominal' => $valueDataRows->nominal
-                ]);
-
-
-                $first8Position = stripos($tempContact['phone'], '8', 0);
-
-                if ($first8Position === false) {
+            if ($first8Position === false) {
+                $tempContact['failed'] = 'Phone number error';
+                $existingContacts[] = $tempContact;
+                // $existingContacts[] = implode(';', $tempContact);
+            }
+            else {
+                if ($first8Position > 5) {
                     $tempContact['failed'] = 'Phone number error';
                     $existingContacts[] = $tempContact;
+                    // $existingContacts[] = implode(';', $tempContact);
+                }
+                else {
+                    $tempContact['phone'] = '0' . substr($tempContact['phone'], $first8Position);
+                    if ((strlen($tempContact['phone']) >= 10) && (strlen($tempContact['phone']) <= 15)) {
+                        $contact = DB::insert('
+                            INSERT IGNORE INTO contacts(campaign_id, account_id, name, phone, bill_date, due_date, nominal, extension, callerid, voice)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ', [
+                            $tempContact['campaign_id'],
+                            $tempContact['account_id'],
+                            $tempContact['name'],
+                            $tempContact['phone'],
+                            $tempContact['bill_date'],
+                            $tempContact['due_date'],
+                            $tempContact['nominal'],
+                            0, // $tempContact['extension'],
+                            0, // $tempContact['callerid'],
+                            '', // $tempContact['voice'],
+                        ]);
+
+                        $warningMessages = DB::select('SHOW WARNINGS'); // dd($warningMessages);
+
+                        if (empty($warningMessages)) {
+                            // $newContacts[] = $tempContact;
+                            // $newContacts[] = implode(';', $tempContact);
+                        } else {
+                            $tempContact['failed'] = 'Phone number exists';
+                            $existingContacts[] = $tempContact;
+                            // $existingContacts[] = implode(';', $tempContact);
+                        }
+
+                        $contact = null;
+                        $warningMessages = null;
+                        unset($contact, $warningMessages);
+                    }
+                    else {
+                        $tempContact['failed'] = 'Phone format error';
+                        $existingContacts[] = $tempContact;
+                        // $existingContacts[] = implode(';', $tempContact);
+                    }
+                }
+            }
+
+            $first8Position = null;
+            $tempContact = null;
+            $keyDataRows = null;
+            $valueDataRows = null;
+            unset($first8Position, $tempContact, $keyDataRows, $valueDataRows);
+        }
+
+        ini_set('max_execution_time', 120);
+        return array($newContacts, $existingContacts);
+    }
+    */
+
+    private function saveValidContacts($campaignId, $dataRows, $referenceTable, $reportHeaders)
+    {
+        ini_set('max_execution_time', 0);
+
+        $newContacts = [];
+        $existingContacts = [];
+
+        // ---
+        // --- create sql query for inserting data into reference table
+        // --- get 'handphone' column type
+        // --- get 'voice' column type
+        // ---
+        $phoneColumns = [];
+        $voiceColumns = [];
+        $refColumns = [ 'extension', 'callerid', 'voice', 'created_at', 'updated_at' ];
+        $refBindings = [ '?', '?', '?', '?', '?' ];
+        $insertRefTableCommand = '';
+        if (count($reportHeaders)) {
+            foreach ($reportHeaders  AS $keyHeader => $valHeader) {
+                $refColumns[] = strtolower($valHeader->name);
+                $refBindings[] = '?';
+
+                if ($valHeader->column_type == 'handphone') {
+                    $phoneColumns[] = $valHeader;
+                }
+
+                if ($valHeader->is_voice) {
+                    $voiceColumns[] = $valHeader;
+                }
+            }
+
+            $insertRefTableCommand = 'INSERT IGNORE INTO ' . $referenceTable . ' (<ref_columns>) ';
+            $insertRefTableCommand .= 'VALUES (<ref_bindings>)';
+            $insertRefTableCommand = str_replace(
+                array('<ref_columns>', '<ref_bindings>'),
+                array(implode(', ', $refColumns), implode(', ', $refBindings)),
+                $insertRefTableCommand
+            );
+        }
+        // dd($voiceColumns);
+        // dd($insertRefTableCommand);
+
+        if (count($phoneColumns) > 0) {
+            // -- connection with sip
+            /*
+            $sip = DB::connection('sip')
+                    ->table('sip')
+                    ->selectRaw('DISTINCT(id) as extension, data as callerid')
+                    ->where('keyword', 'callerid')
+                    ->where('id', 'like', env('SIP_PREFIX_EXT').'%')
+                    ->orderBy(DB::raw('RAND()'))
+                    ->get();
+            $sipIdxCount = $sip->count() - 1;
+            $rand = 0;
+            */
+
+            foreach ($dataRows AS $keyDataRows => $valDataRows) {
+                $tempContact = array(
+                    'extension' => null,
+                    'callerid' => null,
+                    'voice' => null,
+                    'created_at' => Carbon::now('Asia/Jakarta')->format('Y-m-d H:i:s'),
+                    'updated_at' => Carbon::now('Asia/Jakarta')->format('Y-m-d H:i:s'),
+                );
+
+                // ---
+                // --- put excel data into template's columns
+                // --- get the handphone column type
+                // --- 
+                // dd($reportHeaders);
+                $phoneColumnName = '';
+                $first8Position = '';
+                foreach($reportHeaders  AS $keyHeader => $valHeader) {
+                    $headerName = strtolower($valHeader->name);
+                    $tempContact[$headerName] = $valDataRows->$headerName;
+
+                    if ($valHeader->column_type == 'handphone') {
+                        $phoneColumnName = $headerName;
+                        $first8Position = stripos($tempContact[$headerName], '8', 0);
+                    }
+                }
+                
+                if ($first8Position === false) {
+                    $tempContact['failed'] = 'Phone number format error';
+                    $existingContacts[] = $tempContact;
+                    // $existingContacts[] = implode(';', $tempContact);
                 }
                 else {
                     if ($first8Position > 5) {
                         $tempContact['failed'] = 'Phone number error';
                         $existingContacts[] = $tempContact;
+                        // $existingContacts[] = implode(';', $tempContact);
                     }
                     else {
-                        $tempContact['phone'] = '0' . substr($tempContact['phone'], $first8Position);
-                        if ((strlen($tempContact['phone']) >= 10) && (strlen($tempContact['phone']) <= 15)) {
-                            $isPhoneExists = Contact::where('campaign_id', '=', $tempContact['campaign_id'])
-                                ->where('phone', '=', trim($tempContact['phone']))
-                                ->exists();
-
-                            if (!$isPhoneExists) {
-                                unset($tempContact['failed']);
-                                Contact::insert($tempContact);
+                        $tempContact[$phoneColumnName] = '0' . substr($tempContact[$phoneColumnName], $first8Position);
+                        
+                        if ((strlen($tempContact[$phoneColumnName]) >= 10) && (strlen($tempContact[$phoneColumnName]) <= 15)) {
+                            // -- connection with sip
+                            /*
+                            $rand = rand(0, sipIdxCount);
+                            $tempContact['extension']   = $sip[$rand]->extension;
+                            $tempContact['callerid']    = $sip[$rand]->callerid;
+                            */
+                            $tempContact['voice']       = Helpers::generateVoice($voiceColumns, $valDataRows);
+                            
+                            // ---
+                            // --- insert ignore into DB and get the warnings if any
+                            // ---
+                            $contact = DB::insert($insertRefTableCommand, array_values($tempContact));
+                            $warningMessages = DB::select('SHOW WARNINGS');
+                            // dd($warningMessages);
+    
+                            if (empty($warningMessages)) {
                                 $newContacts[] = $tempContact;
+                                // $newContacts[] = implode(';', $tempContact);
                             }
                             else {
-                                $tempContact['failed'] = 'Phone number exists';
+                                $tempContact['failed'] = 'Has same unique value';
                                 $existingContacts[] = $tempContact;
+                                // $existingContacts[] = implode(';', $tempContact);
                             }
+    
+                            $contact = null;
+                            $warningMessages = null;
+                            unset($contact, $warningMessages);
                         }
                         else {
-                            $tempContact['failed'] = 'Phone format error';
+                            $tempContact['failed'] = 'Phone number must between 10-15 digits';
                             $existingContacts[] = $tempContact;
+                            // $existingContacts[] = implode(';', $tempContact);
                         }
                     }
                 }
-            }
-            else {
-                $tempContact['failed'] = 'Account-ID already exists';
-                $existingContacts[] = $tempContact;
+    
+                $first8Position = null;
+                $tempContact = null;
+                $keyDataRows = null;
+                $valueDataRows = null;
+                unset($first8Position, $tempContact, $keyDataRows, $valueDataRows);
             }
         }
+        else {
+            // 
+        }
 
+        // dd($newContacts);
+
+        ini_set('max_execution_time', 120);
         return array($newContacts, $existingContacts);
+    }
+
+    private function getTemplates()
+    {
+        $templates = Template::select(
+                'templates.id', 'templates.name AS template_name',
+                'template_headers.name AS header_name', 'template_headers.column_type', 'template_headers.is_mandatory',
+                'template_headers.is_unique', 'template_headers.is_voice', 'template_headers.voice_position'
+            )
+            ->rightJoin('template_headers', 'templates.id', '=', 'template_headers.template_id')
+            ->whereNull('templates.deleted_at')
+            ->whereNotNull('template_headers.template_id')
+            ->orderBy('templates.name', 'ASC')
+            ->orderBy('template_headers.id', 'ASC')
+            ->get();
+
+        $tempTemplates = [];
+        $defaultTemplate = [];
+        foreach ($templates AS $keyTemplate => $valTemplate) {
+            if (!isset($tempTemplates['t_' . $valTemplate->id])) {
+                if ($valTemplate->id == 1) {
+                    $defaultTemplate['t_' . $valTemplate->id]['id'] = $valTemplate->id;
+                    $defaultTemplate['t_' . $valTemplate->id]['name'] = $valTemplate->template_name;
+                    $defaultTemplate['t_' . $valTemplate->id]['headers'] = [];
+
+                    $tempTemplates = array_merge($defaultTemplate, $tempTemplates);
+                }
+                else {
+                    $tempTemplates['t_' . $valTemplate->id]['id'] = $valTemplate->id;
+                    $tempTemplates['t_' . $valTemplate->id]['name'] = $valTemplate->template_name;
+                    $tempTemplates['t_' . $valTemplate->id]['headers'] = [];
+                }
+            }
+
+            $tempTemplates['t_' . $valTemplate->id]['headers'][] = $valTemplate;
+        }
+        // dd($tempTemplates);
+        return $tempTemplates;
+    }
+
+    private function getTemplateHeaders($templateId, $isVoiceOrdered=false)
+    {
+        $templateHeaders = TemplateHeader::where('template_id', $templateId)
+            ->whereNull('deleted_at');
+
+        if ($isVoiceOrdered) $templateHeaders->orderBy('voice_position', 'ASC');
+        else $templateHeaders->orderBy('id', 'ASC');
+
+        return $templateHeaders->get();
+    }
+
+    private function getTemplateHeadersTitle($templateId, $isVoiceOrdered=false)
+    {
+        $headers = $this->getTemplateHeaders($templateId, $isVoiceOrdered);
+        foreach ($headers AS $key => $value) {
+            $headers[$key] = strtolower($value->name);
+        }
+        return $headers;
     }
 }

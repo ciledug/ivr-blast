@@ -42,7 +42,7 @@
                     <td>
                       @php
                           switch($valueCampaign->status) {
-                            default: break;
+                            default: echo '-'; break;
                             case 0: echo 'Ready'; break;
                             case 1: echo 'Running'; break;
                             case 2: echo 'Paused'; break;
@@ -54,7 +54,11 @@
                     <td>
                       @if ($valueCampaign->status != 3)
                         @if ($valueCampaign->status == 0)
+                          @if ($valueCampaign->total_data > 0)
                         <button type="button" class="btn btn-sm btn-success btn-start-stop" data-key="{{ $valueCampaign->id}}" onclick="startStopCampaign('{{ $valueCampaign->id }}', '{{ $valueCampaign->status }}')">Start</button>
+                          @else
+                        <button type="button" class="btn btn-sm btn-success-outline" disabled>Start</button>
+                          @endif
                         @elseif ($valueCampaign->status == 1)
                         <button type="button" class="btn btn-sm btn-danger btn-start-stop" data-key="{{ $valueCampaign->id}}" onclick="startStopCampaign('{{ $valueCampaign->id }}', '{{ $valueCampaign->status }}')">Paused</button>
                         @elseif ($valueCampaign->status == 2)
@@ -67,12 +71,6 @@
                       @if ($valueCampaign->status != 3)
                         @if ($valueCampaign->dialed_contacts == 0)
                           <a href="{{ route('campaigns.edit', ['id' => $valueCampaign->id]) }}" class="btn btn-sm btn-warning btn-modal-spinner">Edit</a>
-                        @endif
-                      @endif
-
-
-                      @if ($valueCampaign->status != 3)
-                        @if ($valueCampaign->dialed_contacts == 0)
                           <a href="{{ route('campaigns.delete', ['id' => $valueCampaign->id]) }}" class="btn btn-sm btn-danger btn-modal-spinner">Delete</a>
                         @endif
                       @endif
@@ -81,7 +79,7 @@
                   @endforeach
                 @else
                   <tr>
-                    <td colspan="7" class="text-center">There's no campaign data</td>
+                    <td colspan="7" class="text-center">No campaigns data</td>
                   </tr>
                 @endif  
               </tbody>

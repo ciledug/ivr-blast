@@ -13,7 +13,7 @@
 
 <footer id="footer" class="footer">
     <div class="copyright">
-        &copy; Copyright <strong><span>PT DALnet System</span></strong>. All Rights Reserved
+        &copy; Copyright 2023, <span class="fw-bold">PT DALnet System</span>. All Rights Reserved
     </div>
     <div class="credits">
         <!-- All the links in the footer should remain intact. -->
