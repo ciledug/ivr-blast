@@ -3,6 +3,9 @@
 
 <link rel="stylesheet" type="text/css" href="{{ asset('css/datepicker.min.css') }}">
 
+{{-- @php dd($campaigns); @endphp --}}
+{{-- @php dd($startdate); @endphp --}}
+
 <main id="main" class="main">
   <div class="pagetitle" style="display: flex;align-items: center;justify-content: space-between;">
     <h1>Call Logs</h1>
@@ -39,7 +42,8 @@
 
                     @if($startdate)
                     <div class="col-md-4">
-                      <a href="{{ route('calllogs') }}" class="btn btn-outline-primary">Clear Date</a>
+                      {{-- <a href="{{ route('calllogs') }}" class="btn btn-outline-primary">Clear Date</a> --}}
+                      <a href="{{ route('calllogs', ['campaign' => $selectedCampaign[0]->camp_id]) }}" class="btn btn-outline-primary">Clear Date</a>
                     </div>
                     @endif
                   </div>
@@ -50,12 +54,12 @@
                   <select class="form-select" id="select-campaign-list" aria-label="Campaign" name="campaign">
                     <option value="" selected></option>
                     @foreach ($campaigns AS $keyCampaign => $valueCampaign)
-                      @if ($valueCampaign->id === $selectedCampaign)
+                      @if ($valueCampaign->id === (count($selectedCampaign) > 0 ? $selectedCampaign[0]->camp_id : ''))
                       <option value="{{ $valueCampaign->id }}" selected>{{ $valueCampaign->name }}</option>
                       @else
                       <option value="{{ $valueCampaign->id }}">{{ $valueCampaign->name }}</option>
                       @endif
-                      @endforeach
+                    @endforeach
                     </select>
                 </div>
               </div>
@@ -64,11 +68,11 @@
             <table id="table-campaign-list-container" class="table table-hover">
               <thead class="align-top">
                 <tr>
-                  @if (count($template_headers) > 0)
+                  @if (count($selectedCampaign) > 0)
                     <th scope="col" class="align-top text-center">#</th>
                     
-                    @foreach($template_headers AS $keyHeader => $valHeader)
-                    <th scope="col" class="align-top">{{ strtoupper($valHeader->name) }}</th>
+                    @foreach($selectedCampaign AS $keyHeader => $valHeader)
+                    <th scope="col" class="align-top">{{ strtoupper($valHeader->tmpl_header_name) }}</th>
                     @endforeach
                       
                     <th scope="col" class="align-top">CALL DIAL</th>
@@ -89,20 +93,21 @@
                   <tr>
                     <td class="text-end">{{ $row_number++ }}.</td>
 
-                    @foreach($template_headers AS $keyHeader => $valHeader)
-                      @php $columnName = strtolower($valHeader->name) @endphp
-                      @if ($valHeader->is_mandatory)
-                        @if ($valHeader->column_type === 'string')
+                    @foreach($selectedCampaign AS $keyHeader => $valHeader)
+                      @php $columnName = strtolower($valHeader->tmpl_header_name) @endphp
+
+                      @if ($valHeader->templ_is_mandatory)
+                        @if ($valHeader->tmpl_col_type === 'string')
                         <td>{{ $valueCallLog->$columnName }}</td>
-                        @elseif ($valHeader->column_type === 'handphone')
+                        @elseif ($valHeader->tmpl_col_type === 'handphone')
                         <td>{{ substr($valueCallLog->$columnName, 0, 4) . 'xxxxxx' . substr($valueCallLog->$columnName, strlen($valueCallLog->$columnName) - 3) }}</td>
-                        @elseif ($valHeader->column_type === 'numeric')
+                        @elseif ($valHeader->tmpl_col_type === 'numeric')
                         <td class="text-end">{{ number_format($valueCallLog->$columnName, 0, '.', '.') }}</td>
-                        @elseif ($valHeader->column_type === 'datetime')
+                        @elseif ($valHeader->tmpl_col_type === 'datetime')
                         <td>{{ date('d/m/Y H:i:s', strtotime($valueCallLog->$columnName)) }}</td>
-                        @elseif ($valHeader->column_type === 'date')
+                        @elseif ($valHeader->tmpl_col_type === 'date')
                         <td>{{ date('d/m/Y', strtotime($valueCallLog->$columnName)) }}</td>
-                        @elseif ($valHeader->column_type === 'time')
+                        @elseif ($valHeader->tmpl_col_type === 'time')
                         <td>{{ date('H:i:s', strtotime($valueCallLog->$columnName)) }}</td>
                         @endif
                       @endif
@@ -112,7 +117,7 @@
                     <td>{{ $valueCallLog->call_connect ? date('H:i:s', strtotime($valueCallLog->call_connect)) : '' }}</td>
                     <td>{{ $valueCallLog->call_disconnect ? date('H:i:s', strtotime($valueCallLog->call_disconnect)) : '' }}</td>
                     <td class="text-end">{{ $valueCallLog->call_duration > 0 ? App\Helpers\Helpers::secondsToHms($valueCallLog->call_duration) : '' }}</td>
-                    <td>{{ $valueCallLog->call_response }}</td>
+                    <td>{{ strtoupper($valueCallLog->call_response) }}</td>
 
                     <td style="padding:4px 0;" class="text-center" >
                       @if (!empty($valueCallLog->call_duration))
@@ -125,7 +130,7 @@
                   @endforeach
                 @else
                   <tr>
-                    <td colspan="{{ $template_headers->count() + 7 }}" class="text-center">No call logs data</td>
+                    <td colspan="{{ count($selectedCampaign) + 7 }}" class="text-center">No call logs data</td>
                   </tr>
                 @endif
               </tbody>

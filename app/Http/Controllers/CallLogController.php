@@ -28,13 +28,12 @@ class CallLogController extends Controller
     {
         // dd($request->input());
 
-        $campaigns = Campaign::select('id', 'unique_key', 'name')->get();
-        $campaignMaxId = Campaign::max('id');
+        $campaigns = Campaign::select('id', 'unique_key', 'name')->whereNull('deleted_at')->get();
         $callLogs = array();
-        $templateHeaders = [];
+        $selectedCampaign = [];
 
         $validator = Validator::make($request->input(), [
-            'campaign' => 'nullable|numeric|min:1|max:' . $campaignMaxId,
+            'campaign' => 'nullable|numeric|min:1|max:' . Campaign::max('id'),
             'startdate' => 'nullable|date_format:d/m/Y',
             'enddate' => 'nullable|date_format:d/m/Y',
         ]);
@@ -46,26 +45,26 @@ class CallLogController extends Controller
         $rowNumber = 0;
 
         if (isset($request->campaign) && $request->campaign >= 1) {
-            $theCampaign = Campaign::select(
-                    'campaigns.id AS campaign_id', 'campaigns.template_id', 'campaigns.reference_table'
+            $selectedCampaign = Campaign::select(
+                    'campaigns.id AS camp_id', 'campaigns.template_id AS camp_templ_id', 'campaigns.reference_table AS camp_ref_table',
+                    'template_headers.name AS tmpl_header_name', 'template_headers.column_type AS tmpl_col_type',
+                    'template_headers.is_mandatory AS templ_is_mandatory', 'template_headers.is_unique AS templ_is_unique',
+                    'template_headers.is_voice AS templ_is_voice', 'template_headers.voice_position AS templ_voice_position'
                 )
+                ->leftJoin('template_headers', 'campaigns.template_id', '=', 'template_headers.template_id')
                 ->where('campaigns.id', $request->campaign)
                 ->whereNull('campaigns.deleted_at')
-                ->first();
-            // dd($theCampaign);
+                ->get();
+            // dd($selectedCampaign);
 
-            if ($theCampaign) {
-                $tableReference = $theCampaign->reference_table;
+            if ($selectedCampaign->count() > 0) {
+                $tableReference = strtolower($selectedCampaign[0]->camp_ref_table);
                 $tableReferenceCallLogs = $tableReference . '_call_logs';
                 $mandatoryColumns = [];
 
-                $templateHeaders = TemplateHeader::where('template_id', $theCampaign->template_id)
-                    ->whereNull('deleted_at')
-                    ->get();
-
-                foreach ($templateHeaders AS $keyHeader => $valHeader) {
-                    if ($valHeader->is_mandatory || ($valHeader->type === 'handphone')) {
-                        $mandatoryColumns[] = strtolower($tableReference . '.' . $valHeader->name);
+                foreach ($selectedCampaign AS $keyHeader => $valHeader) {
+                    if ($valHeader->templ_is_mandatory || ($valHeader->tmpl_col_type === 'handphone')) {
+                        $mandatoryColumns[] = $tableReference . '.' . strtolower($valHeader->tmpl_header_name);
                     }
                 }
                 // dd($mandatoryColumns);
@@ -76,7 +75,7 @@ class CallLogController extends Controller
                     ->leftJoin($tableReference, $tableReferenceCallLogs . '.contact_id', '=', $tableReference . '.id')
                     ->orderBy($tableReferenceCallLogs . '.id', 'DESC');
 
-                if($startdate){
+                if ($startdate) {
                     $f_startdate = date('Y-m-d', strtotime(str_replace('/', '-', $startdate)));
                     $f_enddate = date('Y-m-d', strtotime(str_replace('/', '-', $enddate)));
                     $callLogs->whereRaw('DATE(' . $tableReferenceCallLogs . '.call_dial) BETWEEN ? AND ?', [$f_startdate, $f_enddate]);
@@ -101,17 +100,17 @@ class CallLogController extends Controller
         return view('calllogs.index', array(
             'row_number' => $rowNumber,
             'campaigns' => $campaigns,
-            'selectedCampaign' => (int) $request->campaign,
+            'selectedCampaign' => $selectedCampaign,
             'calllogs' => $callLogs,
-            'startdate' =>$startdate,
-            'enddate' => $enddate,
-            'template_headers' => $templateHeaders,
+            'startdate' => $startdate,
+            'enddate' => $enddate
         ));
     }
 
     public function exportData(Request $request)
     {
         $input = $request->all();
+        // dd($input);
 
         $validator = Validator::make($input, [
             'export_campaign' => 'required|numeric|min:1|max:' . Campaign::max('id'),
@@ -122,66 +121,77 @@ class CallLogController extends Controller
             return back();
         }
 
-        $startdate  = $request->startdate ? $request->startdate : null;
-        $enddate    = $request->enddate ? $request->enddate : null;
+        $campaignId = $request->export_campaign ? $request->export_campaign : null;
+        
+        if ($campaignId) {
+            $startdate  = $request->startdate ? $request->startdate : null;
+            $enddate    = $request->enddate ? $request->enddate : null;
+            $campaignCallLogs = $this->getCampaignCallLogs($campaignId, $startdate, $enddate);
+            $filename = 'REPORT_CALL_LOGS_' . strtoupper($campaignCallLogs['campaign'][0]->camp_name) . '_' . time();
 
-        $campaignCallLogs = $this->getCampaignCallLogs($request->export_campaign, $startdate, $enddate);
-        // dd($campaignCallLogs);
-        $filename = 'report-call-logs-'.time();
-       
-        // excel
-        Excel::load(storage_path('app/public/files/Report_Call_Logs.xlsx'), function($file) use($request, $campaignCallLogs) {
-            $sheet = $file->setActiveSheetIndex(0);
-            $subtitle = null;
-            if($request->export_startdate && $request->export_enddate){
-                $subtitle .= 'Date Range : '.$request->export_startdate.' - '.$request->export_enddate;
-            }
+            Excel::create($filename, function($excel) use($campaignCallLogs, $startdate, $enddate, $campaignId) {
+                $excel->sheet('Sheet1', function($sheet) use($campaignCallLogs, $startdate, $enddate, $campaignId) {
+                    // ---
+                    // --- report title
+                    // ---
+                    $sheet->cell('A1', function($cell) {
+                        $cell->setValue('REPORT CALL LOGS');
+                    });
 
-            if($request->export_campaign){
-                $subtitle .= $request->export_startdate ? ' | ': '';
-                $subtitle .= 'Campaign : '.$campaignCallLogs['campaign']->name;
-            }
-            
-            $sheet->setCellValue('A2', $subtitle);
-
-            // ---
-            // --- column's title
-            // ---
-            if (count($campaignCallLogs['template_headers']) > 0) {
-                foreach($campaignCallLogs['template_headers'] AS $keyHeader => $valHeader) {
-                    $sheet->setCellValueByColumnAndRow($keyHeader, 4, strtoupper($valHeader->name));
-                }
-                
-                $headersCount = count($campaignCallLogs['template_headers']);
-                $sheet->setCellValueByColumnAndRow($headersCount++, 4, 'CALL_CONNECT');
-                $sheet->setCellValueByColumnAndRow($headersCount++, 4, 'CALL_DISCONNECT');
-                $sheet->setCellValueByColumnAndRow($headersCount++, 4, 'CALL_DURATION');
-                $sheet->setCellValueByColumnAndRow($headersCount++, 4, 'CALL_RESPONSE');
-            }
-
-            // ---
-            // --- populate values
-            // ---
-            $excelRowNumber = 5;
-            $columnName = '';
-            foreach ($campaignCallLogs['call_logs']->chunk(300) AS $rows) {
-                foreach($campaignCallLogs['call_logs'] as $row){
-                    foreach ($campaignCallLogs['template_headers'] AS $keyHeader => $valHeader) {
-                        $columnName = strtolower($valHeader->name);
-                        $sheet->setCellValueByColumnAndRow($keyHeader, $excelRowNumber, strtoupper($row->$columnName));
+                    $subtitle = '';
+                    if($startdate && $enddate){
+                        $subtitle .= 'Date Range : '.$startdate.' - '.$enddate;
                     }
+                    if($campaignId){
+                        $subtitle .= $startdate ? ' | ': '';
+                        $subtitle .= 'Campaign : '.$campaignCallLogs['campaign'][0]->camp_name;
+                    }
+                    $sheet->cell('A2', function($cell) use($subtitle) {
+                        $cell->setValue($subtitle);
+                    });
+    
+                    // ---
+                    // --- template/header titles
+                    // ---
+                    $tempHeaders = [];
+                    foreach($campaignCallLogs['campaign'] AS $keyHeader => $valHeader) {
+                        $tempHeaders[] = strtoupper($valHeader->th_name);
+                    }
+                    $tempHeaders[] = 'CALL_CONNECT';
+                    $tempHeaders[] = 'CALL_DISCONNECT';
+                    $tempHeaders[] = 'CALL_DURATION';
+                    $tempHeaders[] = 'CALL_RESPONSE';
+                    $sheet->row(4, $tempHeaders);
+                    array_splice($tempHeaders, -4);
+    
+                    // ---
+                    // --- populate call-log data
+                    // ---
+                    $tempRowContent = [];
+                    $excelRowNumber = 5;
+                    $columnName = '';
+                    foreach ($campaignCallLogs['call_logs']->chunk(300) AS $rows) {
+                        // foreach($campaignCallLogs['call_logs'] as $row){
+                        foreach($rows as $row){
+                            $tempRowContent = [];
 
-                    $headersCount = count($campaignCallLogs['template_headers']);
-                    $sheet->setCellValueByColumnAndRow($headersCount++, $excelRowNumber, $row->call_connect ? date('H:i:s', strtotime($row->call_connect)) : '');
-                    $sheet->setCellValueByColumnAndRow($headersCount++, $excelRowNumber, $row->call_disconnect ? date('H:i:s', strtotime($row->call_disconnect)) : '');
-                    $sheet->setCellValueByColumnAndRow($headersCount++, $excelRowNumber, $row->call_duration > 0 ? App\Helpers\Helpers::secondsToHms($row->call_duration) : '');
-                    $sheet->setCellValueByColumnAndRow($headersCount++, $excelRowNumber, $row->call_response);
-
-                    $excelRowNumber++;
-                }
-            }
-
-        })->download('xlsx');
+                            foreach ($tempHeaders AS $keyHeader => $valHeader) {
+                                $columnName = strtolower($valHeader);
+                                $tempRowContent[] = strtoupper($row->$columnName);
+                            }
+    
+                            $tempRowContent[] = $row->call_connect ? date('H:i:s', strtotime($row->call_connect)) : '';
+                            $tempRowContent[] = $row->call_disconnect ? date('H:i:s', strtotime($row->call_disconnect)) : '';
+                            $tempRowContent[] = $row->call_duration > 0 ? App\Helpers\Helpers::secondsToHms($row->call_duration) : '';
+                            $tempRowContent[] = strtoupper($row->call_response);
+    
+                            $sheet->row($excelRowNumber, $tempRowContent);
+                            $excelRowNumber++;
+                        }
+                    }
+                });
+            })->download('xlsx');
+        }
     }
 
     public function recording(Request $request)
@@ -207,29 +217,25 @@ class CallLogController extends Controller
     private function getCampaignCallLogs($cammpaignId, $startDate=null, $endDate=null)
     {
         $callLogs = [];
-        $templateHeaders = [];
 
         $theCampaign = Campaign::select(
-                'campaigns.id AS campaign_id', 'campaigns.name', 'campaigns.template_id', 'campaigns.reference_table'
+                'campaigns.id AS camp_id', 'campaigns.name AS camp_name', 'campaigns.template_id AS camp_templ_id', 'campaigns.reference_table AS camp_ref_table',
+                'template_headers.name AS th_name', 'template_headers.column_type AS th_col_type', 'template_headers.is_mandatory AS th_is_mandatory',
+                'template_headers.is_unique AS th_is_unique', 'template_headers.is_voice AS th_is_voice', 'template_headers.voice_position AS th_voice_position'
             )
+            ->leftJoin('template_headers', 'campaigns.template_id', '=', 'template_headers.template_id')
             ->where('campaigns.id', $cammpaignId)
             ->whereNull('campaigns.deleted_at')
-            ->first();
+            ->get();
         // dd($theCampaign);
 
-        if ($theCampaign) {
-            $tableReference = $theCampaign->reference_table;
+        if ($theCampaign->count() > 0) {
+            $tableReference = strtolower($theCampaign[0]->camp_ref_table);
             $tableReferenceCallLogs = $tableReference . '_call_logs';
             $mandatoryColumns = [];
 
-            $templateHeaders = TemplateHeader::where('template_id', $theCampaign->template_id)
-                ->whereNull('deleted_at')
-                ->get();
-
-            foreach ($templateHeaders AS $keyHeader => $valHeader) {
-                if ($valHeader->is_mandatory || ($valHeader->type === 'handphone')) {
-                    $mandatoryColumns[] = strtolower($tableReference . '.' . $valHeader->name);
-                }
+            foreach ($theCampaign AS $keyHeader => $valHeader) {
+                $mandatoryColumns[] = strtolower($tableReference . '.' . $valHeader->th_name);
             }
             // dd($mandatoryColumns);
 
@@ -253,7 +259,6 @@ class CallLogController extends Controller
         return array(
             'campaign' => $theCampaign,
             'call_logs' => $callLogs,
-            'template_headers' => $templateHeaders,
         );
     }
 

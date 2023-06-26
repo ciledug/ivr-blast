@@ -16,7 +16,7 @@ class DatabaseSeeder extends Seeder
         $this->call(TemplateSeeder::class);
         $this->call(TemplateHeaderSeeder::class);
         $this->call(CampaignSeeder::class);
-        // $this->call(ContactSeeder::class);
-        // $this->call(CallLogSeeder::class);
+        $this->call(ContactSeeder::class);
+        $this->call(CallLogSeeder::class);
     }
 }

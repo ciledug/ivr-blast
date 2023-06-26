@@ -54,14 +54,14 @@
 
               <!-- campaign name -->
               <div class="col-md-12">
-                <label class="form-label" for="input-campaign-name">Campaign Name (5-100 chars)</label>
+                <label class="form-label" for="input-campaign-name">Campaign Name (5-50 chars)</label>
                 <input
                   type="text"
                   class="form-control"
                   id="input-campaign-name"
                   name="name"
-                  minlength="5" maxlength="100"
-                  placeholder="Campaign name (5-100 chars)"
+                  minlength="5" maxlength="50"
+                  placeholder="Campaign name (5-50 chars)"
                   onkeyup="fillInputTemplateReference()"
                   required
                 >
@@ -180,6 +180,7 @@
               </div>
               --}}
 
+              <!-- campaign upload/download template -->
               <div class="col-md-12 mt-3 mb-4">
                 <label class="form-label" for="input-campaign-excel-file">Upload Contacts Data File</label>
 

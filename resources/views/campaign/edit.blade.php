@@ -57,14 +57,14 @@
               
               <!-- campaign name -->
               <div class="col-md-12 mb-3">
-                <label class="form-label" for="edit-campaign-name">Campaign name (5-100 chars)</label>
+                <label class="form-label" for="edit-campaign-name">Campaign name (5-50 chars)</label>
                 <input
                   type="text"
                   class="form-control"
                   id="edit-campaign-name"
                   name="campaign_name"
-                  minlength="5" maxlength="100"
-                  placeholder="Campaign name (5-100 chars)"
+                  minlength="5" maxlength="50"
+                  placeholder="Campaign name (5-50 chars)"
                   value="{{ $campaign[0]->camp_name or '' }}"
                   onkeyup="fillInputTemplateReference()"
                   required

@@ -36,6 +36,8 @@
                   <div class="row">
                     <div class="col-12 h5">
                       @if ($valHeader->templ_column_type === 'numeric') {{ number_format($contact[0]->$headerName, 0, ',', '.') }}
+                      @elseif ($valHeader->templ_column_type === 'handphone')
+                        {{ substr($contact[0]->$headerName, 0, 4) . 'xxxxxx' . substr($contact[0]->$headerName, strlen($contact[0]->$headerName) - 3) }}
                       @else {{ $contact[0]->$headerName }}
                       @endif
                     </div>

@@ -316,7 +316,7 @@ class CampaignController extends Controller
         // dd($request->input());
 
         $validator = Validator::make($request->input(), [
-            'name' => 'required|string|min:5|max:30',
+            'name' => 'required|string|min:5|max:50',
             'select_campaign_template' => 'required|numeric|min:1',
             'template_reference' => 'required|string|min:5|max:100',
             'campaign_text_voice' => 'nullable|string',
@@ -464,7 +464,7 @@ class CampaignController extends Controller
         // dd($request->input());
         $validator = Validator::make($request->input(), [
             'campaign' => 'required|numeric|min:1|max:' . Campaign::max('id'),
-            'campaign_name' => 'required|string|min:5|max:100',
+            'campaign_name' => 'required|string|min:5|max:50',
             'select_campaign_template' => 'required|numeric|min:1|max:' . Template::max('id'),
             'campaign_voice_gender' => 'required|string|min:10|max:15',
 
@@ -828,7 +828,8 @@ class CampaignController extends Controller
 
         $contacts = array();
         $campaign = TemplateHeader::select(
-                'template_headers.name AS header_name', 'template_headers.column_type AS header_type',
+                'template_headers.name AS th_name', 'template_headers.column_type AS th_type', 'template_headers.is_mandatory AS th_is_mandatory',
+                'template_headers.is_unique AS th_is_unique', 'template_headers.is_voice AS th_is_voice', 'template_headers.voice_position AS th_voice_position',
                 'campaigns.id AS camp_id', 'campaigns.unique_key AS camp_unique_key', 'campaigns.name AS camp_name', 'campaigns.total_data AS camp_total_data',
                 'campaigns.status AS camp_status', 'campaigns.created_at AS camp_created_at', 'campaigns.reference_table AS camp_reference_table'
             )
@@ -837,7 +838,7 @@ class CampaignController extends Controller
             ->whereNull('campaigns.deleted_at')
             ->get();
         // dd($campaign);
-            
+
         if ($campaign->count() > 0) {
             $campaignInfo = DB::table($campaign[0]->camp_reference_table)
                 ->selectRaw("
@@ -857,10 +858,9 @@ class CampaignController extends Controller
             $contacts = DB::table($campaign[0]->camp_reference_table)->get();
             // dd($contacts);
 
-            $fileName = 'IVR_BLAST-'
-                . $campaign[0]->camp_unique_key
-                . '-' . strtoupper(Str::replaceFirst(' ', '_', $campaign[0]->camp_name))
-                . '-' . Carbon::now('Asia/Jakarta')->format('Ymd_His');
+            $fileName = 'REPORT_CAMPAIGN'
+                . '-' . strtoupper(preg_replace('/\W+/i', '_', $campaign[0]->camp_name))
+                . '-' . Carbon::now('Asia/Jakarta')->format('d_m_Y-H_i_s');
             
             if ($request->export_type === 'pdf') {
                 $pdf = App::make('dompdf.wrapper');
@@ -873,77 +873,118 @@ class CampaignController extends Controller
                 return $pdf->download($fileName . '.pdf');
             }
             else if ($request->export_type === 'excel') {
-                $excelDownload = storage_path('app/public/files/Report_IVR_Blast.xlsx');
-                
-                Excel::load($excelDownload, function($file) use($campaign, $contacts, $campaignInfo, $progress) {
-                    switch ($campaign[0]->camp_status) {
-                        case 0: $campaign[0]->camp_status = 'Ready'; break;
-                        case 1: $campaign[0]->camp_status = 'Running'; break;
-                        case 2: $campaign[0]->camp_status = 'Paused'; break;
-                        case 3: $campaign[0]->camp_status = 'Finished'; break;
-                        default: break;
-                    }
-
-                    $sheet = $file->setActiveSheetIndex(0);
-                    $sheet->setCellValue('A2', $campaign[0]->camp_name);
-                    $sheet->setCellValue('E2', $campaignInfo->started ? date('d/m/Y - H:i', strtotime($campaignInfo->started)) : '-');
-                    $sheet->setCellValue('A5', $campaign[0]->camp_total_data);
-                    $sheet->setCellValue('E5', ($campaignInfo->finished != '-') ? date('d/m/Y - H:i', strtotime($campaignInfo->finished)) : '-');
-                    $sheet->setCellValue('A8', $campaign[0]->camp_status);
-                    $sheet->setCellValue('E8', $campaignInfo->total_calls);
-                    $sheet->setCellValue('A11', date('d/m/Y - H:i', strtotime($campaign[0]->camp_created_at)));
-                    $sheet->setCellValue('E11', $campaignInfo->success);
-                    $sheet->setCellValue('A14', $progress);
-                    $sheet->setCellValue('E14', $campaignInfo->failed);
-
-                    // --
-                    // -- populate table title
-                    // --
-                    if ($campaign->count() > 0) {
-                        foreach($campaign AS $keyHeader => $valHeader) {
-                            // $theCell = $sheet->getCellByColumnAndRow((0 + $keyHeader), 16);
-                            // $theCell->setFontWeight('bold');
-                            // $theCell->setBorder('solid', 'solid', 'solid', 'solid');
-                            $sheet->setCellValueByColumnAndRow((0 + $keyHeader), 16, strtoupper($valHeader->header_name));
+                Excel::create($fileName, function($excel) use($campaign, $contacts, $campaignInfo, $progress) {
+                    $excel->sheet('Sheet1', function($sheet) use($campaign, $contacts, $campaignInfo, $progress) {
+                        // ---
+                        // --- create report headers starts
+                        // ---
+                        switch ($campaign[0]->camp_status) {
+                            case 0: $campaign[0]->camp_status = 'Ready'; break;
+                            case 1: $campaign[0]->camp_status = 'Running'; break;
+                            case 2: $campaign[0]->camp_status = 'Paused'; break;
+                            case 3: $campaign[0]->camp_status = 'Finished'; break;
+                            default: break;
                         }
+                        
+                        $sheet->cell('A1', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue('NAME'); });
+                        $sheet->cell('A2', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue($campaign[0]->camp_name); });
 
-                        // $theCell = $sheet->getCellByColumnAndRow($campaign->count(), 16);
-                        // $theCell->setValue('CALL_DATE');
+                        $sheet->cell('A4', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue('TOTAL DATA'); });
+                        $sheet->cell('A5', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue($campaign[0]->camp_total_data); });
 
-                        $sheet->setCellValueByColumnAndRow($campaign->count(), 16, 'CALL_DATE');
-                        $sheet->setCellValueByColumnAndRow($campaign->count() + 1, 16, 'CALL_RESPONSE');
-                        $sheet->setCellValueByColumnAndRow($campaign->count() + 2, 16, 'TOTAL_CALLS');
-                    }
+                        $sheet->cell('A7', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue('STATUS'); });
+                        $sheet->cell('A8', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue($campaign[0]->camp_status); });
 
-                    $excelRowNumber = 17;
-                    $headerName = '';
-                    foreach ($contacts->chunk(100) as $chunks) {
-                        foreach ($chunks as $valueContact) {
-                            foreach($campaign AS $keyHeader => $valHeader) {
-                                $headerName = strtolower($valHeader->header_name);
+                        $sheet->cell('A10', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue('CREATED DATE'); });
+                        $sheet->cell('A11', function($cell) use($campaign, $contacts, $campaignInfo, $progress) {
+                            $cell->setValue(date('d/m/Y - H:i', strtotime($campaign[0]->camp_created_at)));
+                        });
 
-                                switch ($valHeader->header_type) {
-                                    case 'handphone':
-                                        $sheet->setCellValueByColumnAndRow(
-                                            (0 + $keyHeader),
-                                            $excelRowNumber,
-                                            substr($valueContact->$headerName, 0, 4) . 'xxxxxx' . substr($valueContact->$headerName, strlen($valueContact->$headerName) - 3)
-                                        );
-                                        break;
-                                    default:
-                                        $sheet->setCellValueByColumnAndRow((0 + $keyHeader), $excelRowNumber, $valueContact->$headerName);
-                                        break;
-                                }
+                        $sheet->cell('A13', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue('CAMPAIGN PROGRESS (%)'); });
+                        $sheet->cell('A14', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue($progress); });
+
+                        $sheet->cell('C1', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue('DATE STARTED'); });
+                        $sheet->cell('C2', function($cell) use($campaign, $contacts, $campaignInfo, $progress) {
+                            $cell->setValue($campaignInfo->started ? date('d/m/Y - H:i', strtotime($campaignInfo->started)) : '-');
+                        });
+
+                        $sheet->cell('C4', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue('DATE FINISHED'); });
+                        $sheet->cell('C5', function($cell) use($campaign, $contacts, $campaignInfo, $progress) {
+                            $cell->setValue(($campaignInfo->finished != '-') ? date('d/m/Y - H:i', strtotime($campaignInfo->finished)) : '-');
+                        });
+
+                        $sheet->cell('C7', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue('TOTAL CALLS'); });
+                        $sheet->cell('C8', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue($campaignInfo->total_calls); });
+
+                        $sheet->cell('C10', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue('SUCCESS CALLS'); });
+                        $sheet->cell('C11', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue($campaignInfo->success); });
+
+                        $sheet->cell('C13', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue('FAILED CALLS'); });
+                        $sheet->cell('C14', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue($campaignInfo->failed); });
+                        // --- create headers finished
+
+                        // --
+                        // -- create template titles
+                        // --
+                        if ($campaign->count() > 0) {
+                            $tempRowContent = [];
+                            $tempColExtensions = [];
+                
+                            foreach ($campaign AS $keyHeader => $valHeader) {
+                                // $tempColExtensions = [];
+                                // if ($valHeader->th_is_mandatory) $tempColExtensions[] = 'mandatory';
+                                // if ($valHeader->th_is_unique) $tempColExtensions[] = 'unique';
+                                // if ($valHeader->th_is_voice) $tempColExtensions[] = 'voice-' . $valHeader->th_voice_position;
+                                // $tempColName = strtoupper($valHeader->th_name) . ' (' . implode(', ', $tempColExtensions) . ')';
+
+                                $tempColName = strtoupper($valHeader->th_name);
+                                $tempRowContent[] = $tempColName;
                             }
 
-                            $sheet->setCellValueByColumnAndRow($campaign->count(), $excelRowNumber, $valueContact->call_dial ? $valueContact->call_dial : '');
-                            $sheet->setCellValueByColumnAndRow($campaign->count() + 1, $excelRowNumber, $valueContact->call_response ? $valueContact->call_response : '');
-                            $sheet->setCellValueByColumnAndRow($campaign->count() + 2, $excelRowNumber, $valueContact->total_calls ? $valueContact->total_calls : 0);
+                            $tempRowContent[] = 'CALL_DATE';
+                            $tempRowContent[] = 'CALL_RESPONSE';
+                            $tempRowContent[] = 'TOTAL_CALLS';
 
-                            $excelRowNumber++;
+                            $sheet->row(16, $tempRowContent);
                         }
-                    }
+                        // --- create template title finished
 
+                        // ---
+                        // --- populate data into excel
+                        // ---
+                        $excelRowNumber = 17;
+                        $headerName = '';
+                        $tempContactRow = [];
+
+                        foreach ($contacts->chunk(100) as $chunks) {
+                            foreach ($chunks as $valueContact) {
+                                $tempContactRow = [];
+
+                                foreach($campaign AS $keyHeader => $valHeader) {
+                                    $headerName = strtolower($valHeader->th_name);
+
+                                    switch ($valHeader->th_type) {
+                                        case 'handphone':
+                                            $tempContactRow[] = substr($valueContact->$headerName, 0, 4)
+                                                . 'xxxxxx'
+                                                . substr($valueContact->$headerName, strlen($valueContact->$headerName) - 3);
+                                            break;
+                                        default:
+                                            $tempContactRow[] = $valueContact->$headerName;
+                                            break;
+                                    }
+                                }
+
+                                $tempContactRow[] = $valueContact->call_dial ? $valueContact->call_dial : '';
+                                $tempContactRow[] = $valueContact->call_response ? strtoupper($valueContact->call_response) : '';
+                                $tempContactRow[] = $valueContact->total_calls ? $valueContact->total_calls : 0;
+
+                                $sheet->row($excelRowNumber, $tempContactRow);
+                                $excelRowNumber++;
+                            }
+                        }
+                        // --- populate data finished
+                    });
                 })->download('xlsx');
             }
         }
@@ -962,34 +1003,39 @@ class CampaignController extends Controller
 
     public function downloadTemplate($templateId)
     {
-        $fileTemplate = storage_path('app/public/files/Template_IVR_Blast.xlsx');
+        $tempFileName = 'dummy';
+        $tempHeaders = Template::select(
+                'templates.name AS templ_name',
+                'template_headers.name AS th_name', 'template_headers.column_type AS th_type', 'template_headers.is_mandatory AS th_is_mandatory',
+                'template_headers.is_unique AS th_is_unique', 'template_headers.is_voice AS th_is_voice', 'template_headers.voice_position AS th_voice_position'
+            )
+            ->leftJoin('template_headers', 'templates.id', '=', 'template_headers.template_id')
+            ->where('templates.id', $templateId)
+            ->whereNull('templates.deleted_at')
+            ->get();
+        // dd($tempHeaders);
 
-        Excel::load($fileTemplate, function($file) use ($templateId) {
-            if ($templateId > 0) {
-                $sheet = $file->setActiveSheetIndex(0);
-                $sheet->removeRow(5, 9);
-                $sheet->removeColumn('A', 5);
-                $sheet->setCellValue('A2', null);
-                // $sheet->getProtection()->setSheet(true);
+        if ($tempHeaders->count() > 0) $tempFileName = preg_replace('/\W+/i', '_', $tempHeaders[0]->templ_name);
+        $tempFileName .= '_' . Carbon::now('Asia/Jakarta')->format('d_m_Y_H_i_s');
 
-                $reportHeaders = $this->getTemplateHeaders($templateId);
-                foreach($reportHeaders AS $keyHeader => $valHeader) {
-                    $tempColumnTitle = strtoupper($valHeader->name);
-                    $columnOptions = [];
+        Excel::create('TEMPLATE_' . $tempFileName, function($excel) use($tempFileName, $tempHeaders) {
+            $tempRowContent = [];
+            $tempColExtensions = [];
 
-                    if ($valHeader->is_mandatory === 1) { $columnOptions[] = 'mandatory'; }
-                    if ($valHeader->is_unique === 1) { $columnOptions[] = 'unique'; }
-                    if ($valHeader->is_voice === 1) { $columnOptions[] = 'voice-' . $valHeader->voice_position; }
-
-                    if (count($columnOptions) > 0) {
-                        $tempColumnTitle .= ' (' . implode(', ', $columnOptions) . ')';
-                    }
-
-                    $sheet->setCellValueByColumnAndRow($keyHeader, 1, $tempColumnTitle);
-                    // $sheet->getStyleByColumnAndRow($keyHeader, 1)->getProtection()->setLocked(\PHPExcel_Style_Protection::PROTECTION_PROTECTED);
-                }
-                // $sheet->getStyle('A2:XFD100000')->getProtection()->setLocked(\PHPExcel_Style_Protection::PROTECTION_UNPROTECTED);
+            foreach ($tempHeaders AS $keyHeader => $valHeader) {
+                $tempColExtensions = [];
+                if ($valHeader->th_is_mandatory) $tempColExtensions[] = 'mandatory';
+                if ($valHeader->th_is_unique) $tempColExtensions[] = 'unique';
+                if ($valHeader->th_is_voice) $tempColExtensions[] = 'voice-' . $valHeader->th_voice_position;
+    
+                $tempColName = strtoupper($valHeader->th_name) . ' (' . implode(', ', $tempColExtensions) . ')';
+                $tempRowContent[] = $tempColName;
             }
+
+            $excel->sheet('Sheet1', function($sheet) use($tempRowContent) {
+                $sheet->row(1, $tempRowContent);
+            });
+
         })->download('xlsx');
     }
 
@@ -1405,20 +1451,20 @@ class CampaignController extends Controller
         return $tempTemplates;
     }
 
-    private function getTemplateHeaders($templateId, $isVoiceOrdered=false)
+    private function getTemplateHeaders($templateId, $isOrderedByVoice=false)
     {
         $templateHeaders = TemplateHeader::where('template_id', $templateId)
             ->whereNull('deleted_at');
 
-        if ($isVoiceOrdered) $templateHeaders->orderBy('voice_position', 'ASC');
+        if ($isOrderedByVoice) $templateHeaders->orderBy('voice_position', 'ASC');
         else $templateHeaders->orderBy('id', 'ASC');
 
         return $templateHeaders->get();
     }
 
-    private function getTemplateHeadersTitle($templateId, $isVoiceOrdered=false)
+    private function getTemplateHeadersTitle($templateId, $isOrderedByVoice=false)
     {
-        $headers = $this->getTemplateHeaders($templateId, $isVoiceOrdered);
+        $headers = $this->getTemplateHeaders($templateId, $isOrderedByVoice);
         foreach ($headers AS $key => $value) {
             $headers[$key] = strtolower($value->name);
         }

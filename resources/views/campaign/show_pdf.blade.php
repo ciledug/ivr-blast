@@ -68,7 +68,7 @@
 
 <body>
 
-  {{-- @php dd($campaign) @endphp --}}
+{{-- @php dd($campaign) @endphp --}}
 
 <main id="main" class="main">
     <div class="row">
@@ -113,14 +113,12 @@
         <hr style="border:none;" />
 
         <div style="padding-top:0.85em;">
-          @php $headerName = ''; @endphp
-          
           <table class="table table-hover table-data" style="width:100%; font-size:0.73em;">
             <thead>
               <tr class="bg-primary">
                 <th scope="col" class="text-center">#</th>
                 @foreach ($campaign AS $keyCamp => $valCamp)
-                <th scope="col">{{ strtoupper($valCamp->header_name) }}</th>
+                <th scope="col">{{ strtoupper($valCamp->th_name) }}</th>
                 @endforeach
 
                 <th scope="col">CALL DATE</th>
@@ -130,6 +128,7 @@
             </thead>
 
             <tbody>
+              @php $headerName = ''; @endphp
               @foreach($contacts->chunk(300) AS $datacontact)
                 @foreach($datacontact AS $contact)
 
@@ -142,8 +141,9 @@
                   <td class="text-right">{{ $loop->iteration }}.</td>
                   @php
                   foreach ($campaign AS $keyCamp => $valCamp) {
-                    $headerName = strtolower($valCamp->header_name);
-                    switch ($valCamp->header_type) {
+                    $headerName = strtolower($valCamp->th_name);
+
+                    switch ($valCamp->th_type) {
                       case 'numeric':
                         echo '<td class="text-right">' . number_format($contact->$headerName, 0, ',', '.');
                         break;
@@ -159,7 +159,7 @@
                   @endphp
 
                   <td>{{ $contact->call_dial ? date('d/m/Y - H:i', strtotime($contact->call_dial)) : '' }}</td>
-                  <td>{{ $contact->call_response ? $contact->call_response : '' }}</td>
+                  <td>{{ $contact->call_response ? strtoupper($contact->call_response) : '' }}</td>
                   <td class="text-right" style="padding-right:10px;">{{ number_format($contact->total_calls, 0, ',', '.') }}</td>
 
                 </tr>
