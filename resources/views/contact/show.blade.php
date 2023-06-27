@@ -77,7 +77,7 @@
                         <td>{{ $logs->call_connect ? date('H:i:s', strtotime($logs->call_connect)) : '' }}</td>
                         <td>{{ $logs->call_disconnect ? date('H:i:s', strtotime($logs->call_disconnect)) : '' }}</td>
                         <td>{{ $logs->call_duration > 0 ? App\Helpers\Helpers::secondsToHms($logs->call_duration) : '' }}</td>
-                        <td>{{ $logs->call_response }}</td>
+                        <td>{{ strtoupper($logs->call_response) }}</td>
 
                         <td style="text-align: center;padding:4px 0px">
                           @if($logs->call_duration > 0)

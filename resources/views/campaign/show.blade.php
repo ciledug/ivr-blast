@@ -258,7 +258,7 @@
                       @endforeach
 
                       <td>{{ $valueData->call_dial ? date('d/m/Y H:i', strtotime($valueData->call_dial)) : '-' }}</td>
-                      <td>{{ $valueData->call_response or '-' }}</td>
+                      <td>{{ $valueData->call_response ? strtoupper($valueData->call_response) : '-' }}</td>
                       <td class="text-end">{{ number_format($valueData->total_calls, 0, ',', '.') }}</td>
                       <td>
                         <a href="{{ route('contacts.show', [ 'id' => $valueData->id, 'campaignId' => $campaign->id ]) }}" class="btn btn-sm btn-info">Detail</a>

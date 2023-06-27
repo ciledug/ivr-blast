@@ -49,6 +49,7 @@ class ContactController extends Controller
             ->select($referenceTable . '.*', $referenceTable . '_call_logs.*', $referenceTable . '_call_logs.created_at AS call_logs_created_at')
             ->leftJoin($referenceTable . '_call_logs', $referenceTable . '.id', '=', $referenceTable . '_call_logs.contact_id')
             ->where($referenceTable . '.id', $id)
+            ->orderBy($referenceTable . '_call_logs.call_dial', 'ASC')
             ->get();
         // dd($contact);
 

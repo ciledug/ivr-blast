@@ -105,8 +105,9 @@ class Helpers
 	}
 	*/
 
-	static function generateVoice($voiceColumns, $dataRow)
+	static function generateVoice($textVoice, $voiceColumns, $dataRow)
 	{
+		$voiceHolders = [];
 		$tempGenerates = [];
 		$headerName = '';
 
@@ -115,11 +116,12 @@ class Helpers
 			switch ($valVoice->column_type) {
 				case 'numeric': $tempGenerates[] = self::generateNumber($dataRow->$headerName); break;
 				case 'date': $tempGenerates[] = self::generateDate($dataRow->$headerName); break;
-				default: break;
+				default: $tempGenerates[] = $dataRow->$headerName; break;
 			}
+			$voiceHolders[] = '<voice-' . ($keyVoice + 1) . '>';
 		}
-		// dd($tempGenerates);
-		return implode(' ', $tempGenerates);
+
+		return str_replace($voiceHolders, $tempGenerates, $textVoice);
 	}
 
 
