@@ -37,6 +37,8 @@ class CallLogSeeder extends Seeder
         $campaign = Campaign::select('reference_table')->where('id', 2)->first();
         $referenceTable = strtolower($campaign->reference_table);
         $randConnect = 0;
+        $tempContactCount = 0;
+        $tempDialDate = '';
 
         for ($i=1; $i<=$DUMMY_COUNT; $i++) {
             $callConnect = null;
@@ -50,18 +52,24 @@ class CallLogSeeder extends Seeder
 
             $contact = DB::table($referenceTable)->select(
                     $referenceTable . '.id', $referenceTable . '.due_date', $referenceTable . '.total_calls',
-                    $referenceTable . '_call_logs.call_response'
+                    $referenceTable . '_call_logs.call_dial', $referenceTable . '_call_logs.call_response'
                 )
                 ->leftJoin($referenceTable . '_call_logs', $referenceTable . '.id', '=', $referenceTable . '_call_logs.contact_id')
                 ->where($referenceTable . '.id', $contactId)
                 ->get();
             // dd($contact);
+            $tempContactCount = $contact->count();
 
-            if (($contact->count() < 3) && ($contact[$contact->count() - 1]->call_response !== 'answered')) {
-                $contact = $contact[$contact->count() - 1];
+            if (($tempContactCount < 3) && ($contact[$tempContactCount - 1]->call_response !== 'answered')) {
+                $contact = $contact[$tempContactCount - 1];
 
-                $callDial = Carbon::createFromFormat('Y-m-d H:i:s', $contact->due_date . ' ' . date('H:i:s'))->addSeconds($faker->numberBetween(1, 21));
-                $randConnect = $faker->numberBetween(0, 10);
+                $tempDialDate = $contact->due_date . ' ' . date('H:i:s');
+                if ($contact->call_dial) {
+                    $tempDialDate = Carbon::createFromFormat('Y-m-d H:i:s', $contact->call_dial)->format('Y-m-d') . ' ' . date('H:i:s');
+                }
+
+                $callDial = Carbon::createFromFormat('Y-m-d H:i:s', $tempDialDate)->addHours($tempContactCount);
+                $randConnect = $faker->numberBetween(0, 20);
         
                 if ($randConnect % 2 == 0) {
                     $callConnect = Carbon::createFromFormat('Y-m-d H:i:s', $callDial)->addSeconds($faker->numberBetween(1, 21));

@@ -62,8 +62,8 @@ class DashboardController extends Controller
                         CAST(IFNULL(SUM(IF(call_response="failed", 1, 0)), 0) AS INT) AS call_failed,
                         CAST(SUM(IF(call_response IS NULL, 1, 0)) AS INT) AS data_remaining
                     ')
-                    ->whereRaw("DATE(call_dial) = ?", [$now])
-                    // ->whereRaw("DATE(call_dial) = ?", [ Carbon::now('Asia/Jakarta')->subDays(7)->format('Y-m-d') ])
+                    // ->whereRaw("DATE(call_dial) = ?", [$now])
+                    ->whereRaw("DATE(call_dial) = ?", [ Carbon::now('Asia/Jakarta')->subDays(7)->format('Y-m-d') ])
                     ->first();
                 $data['status'] = $calls;
 
