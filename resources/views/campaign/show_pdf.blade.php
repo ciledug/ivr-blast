@@ -74,18 +74,36 @@
     <div class="row">
       <div class="col-lg-12">
 
+        <!-- headers container -->
+        @php
+        $totalCalls = $campaignInfo ? ($campaignInfo->success + $campaignInfo->no_answer + $campaignInfo->busy + $campaignInfo->failed) : 0;
+        @endphp
+
         <div id="export-campaign-header">
           <table class="table table-hover" style="width:100%;">
             <tr>
-              <td style="width:50%;"><span style="font-weight:bold">Name</span><br>{{ $campaign[0]->camp_name or '' }}</td>
-              <td style="width:50%;"><span style="font-weight:bold">Date Started</span><br>{{ $campaignInfo->started ? date('d/m/Y - H:i', strtotime($campaignInfo->started)) : '-' }}</td>
+              <td style="width:33%;"><span style="font-weight:bold">Name</span><br>{{ $campaign[0]->camp_name or '' }}</td>
+              <td style="width:33%; padding-top:0.85em;"><span style="font-weight:bold">Created Date</span><br>{{ date('d/m/Y - H:i', strtotime($campaign[0]->camp_created_at)) }}</td>
+              <td style="width:33%; padding-top:0.85em;">
+                <span style="font-weight:bold">Total Calls</span><br>
+                {{ $totalCalls }}
+              </td>
             </tr>
             <tr>
-              <td style="width:50%; padding-top:0.85em;"><span style="font-weight:bold">Total Data</span><br>{{ $campaign[0]->camp_total_data or '0' }}</td>
-              <td style="width:50%; padding-top:0.85em;"><span style="font-weight:bold">Date Finished</span><br>{{ $campaignInfo->finished ? date('d/m/Y - H:i', strtotime($campaignInfo->finished)) : '-' }}</td>
+              <td style="width:33%; padding-top:0.85em;"><span style="font-weight:bold">Total Data</span><br>{{ $campaign[0]->camp_total_data or '0' }}</td>
+              <td style="width:33%;"><span style="font-weight:bold">Date Started</span><br>{{ $campaignInfo->started ? date('d/m/Y - H:i', strtotime($campaignInfo->started)) : '-' }}</td>
+              <td style="width:33%; padding-top:0.85em;"><span style="font-weight:bold">Success Calls</span><br>{{ $campaignInfo->success or '0' }}</td>
             </tr>
             <tr>
-              <td style="width:50%; padding-top:0.85em;">
+              <td style="width:33%; padding-top:0.85em;">
+                <span style="font-weight:bold">Campaign Progress (%)</span><br>
+                {{ number_format(($totalCalls / $campaign[0]->camp_total_data) * 100, 2, '.', ',') }}
+              </td>
+              <td style="width:33%; padding-top:0.85em;"><span style="font-weight:bold">Date Finished</span><br>{{ $campaignInfo->finished ? date('d/m/Y - H:i', strtotime($campaignInfo->finished)) : '-' }}</td>
+              <td style="width:33%; padding-top:0.85em;"><span style="font-weight:bold">No Answer Calls</span><br>{{ $campaignInfo->no_answer or '0' }}</td>
+            </tr>
+            <tr>
+              <td style="width:33%; padding-top:0.85em;">
                 <span style="font-weight:bold">Status</span><br>
                 @php
                 switch ($campaign[0]->camp_status) {
@@ -97,21 +115,21 @@
                 }
                 @endphp
               </td>
-              <td style="width:50%; padding-top:0.85em;"><span style="font-weight:bold">Total Calls</span><br>{{ $campaignInfo->total_calls or '0' }}</td>
+              <td style="width:33%; padding-top:0.85em;"></td>
+              <td style="width:33%; padding-top:0.85em;"><span style="font-weight:bold">Busy Calls</span><br>{{ $campaignInfo->busy or '0' }}</td>
+              
             </tr>
             <tr>
-              <td style="width:50%; padding-top:0.85em;"><span style="font-weight:bold">Created Date</span><br>{{ date('d/m/Y - H:i', strtotime($campaign[0]->camp_created_at)) }}</td>
-              <td style="width:50%; padding-top:0.85em;"><span style="font-weight:bold">Success Calls</span><br>{{ $campaignInfo->success or '0' }}</td>
+              <td colspan="2"></td>
+              <td style="width:33%; padding-top:0.85em;"><span style="font-weight:bold">Failed Calls</span><br>{{ $campaignInfo->failed or '0' }}</td>
             </tr>
-            <tr>
-              <td style="width:50%; padding-top:0.85em;"><span style="font-weight:bold">Campaign Progress (%)</span><br>{{ $progress or '0' }}</td>
-              <td style="width:50%; padding-top:0.85em;"><span style="font-weight:bold">Failed Calls</span><br>{{ $campaignInfo->failed or '0' }}</td>
-            </tr>
+
           </table>
         </div>
 
         <hr style="border:none;" />
 
+        <!-- contacts container -->
         <div style="padding-top:0.85em;">
           <table class="table table-hover table-data" style="width:100%; font-size:0.73em;">
             <thead>

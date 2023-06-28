@@ -2,7 +2,7 @@
 @include('layouts.include_sidebar')
 
 <main id="main" class="main">
-  {{-- @php echo '<pre>'; print_r($campaign); echo '</pre>'; @endphp --}}
+  {{-- @php echo '<pre>'; print_r($campaign[0]); echo '</pre>'; @endphp --}}
 
   <div class="pagetitle">
     <h1>Campaigns</h1>
@@ -39,7 +39,7 @@
                       <div class="col-12 label fw-bold">Name</div>
                     </div>
                     <div class="row">
-                      <div id="dialog-detail-campaign-name" class="col-12 h5">{{ $campaign->name }}</div>
+                      <div id="dialog-detail-campaign-name" class="col-12 h5">{{ $campaign[0]->camp_name }}</div>
                     </div>
                   </div>
                 </div>
@@ -52,7 +52,7 @@
                     </div>
                     <div class="row">
                       <div id="dialog-detail-campaign-total-data" class="col-12 h5">
-                        {{ number_format($campaign->total_data, 0, ',', '.') }}
+                        {{ number_format($campaign[0]->camp_total_data, 0, ',', '.') }}
                       </div>
                     </div>
                   </div>
@@ -67,7 +67,7 @@
                     <div class="row">
                       <div id="dialog-detail-campaign-progress" class="col-12 h5">
                         @php
-                          echo ($campaign_info->dialed_contacts > 0) ? number_format((($campaign_info->dialed_contacts / $campaign->total_data) * 100), 2, ',', '.') : '0';
+                          echo ($campaign_info->dialed_contacts > 0) ? number_format((($campaign_info->dialed_contacts / $campaign[0]->camp_total_data) * 100), 2, ',', '.') : '0';
                         @endphp
                       </div>
                     </div>
@@ -83,8 +83,8 @@
                     <div class="row">
                       <div id="dialog-detail-campaign-status" class="col-12 h5">
                         @php
-                          if ($campaign->total_data > 0) {
-                            switch ($campaign->status) {
+                          if ($campaign[0]->camp_total_data > 0) {
+                            switch ($campaign[0]->camp_status) {
                               case 0: echo 'Ready'; break;
                               case 1: echo 'Running'; break;
                               case 2: echo 'Paused'; break;
@@ -102,14 +102,14 @@
                 </div>
 
                 <!-- start button -->
-                @if (($campaign->total_data > 0) && ($campaign->status !== 3))
+                @if (($campaign[0]->camp_total_data > 0) && ($campaign[0]->camp_status !== 3))
                 <div class="row">
                   <div class="col-md-12 mt-4">
-                      @if ($campaign->status === 0)
+                      @if ($campaign[0]->camp_status === 0)
                       <button type="button" class="btn btn-success btn-campaign-status" id="btn-start-campaign" data-status-value="0">Start Campaign</button>
-                      @elseif ($campaign->status === 1)
+                      @elseif ($campaign[0]->camp_status === 1)
                       <button type="button" class="btn btn-danger btn-campaign-status" id="btn-pause-campaign" data-status-value="1">Pause Campaign</button>
-                      @elseif ($campaign->status === 2)
+                      @elseif ($campaign[0]->camp_status === 2)
                       <button type="button" class="btn btn-success btn-campaign-status" id="btn-resume-campaign" data-status-value="2">Resume Campaign</button>
                       @endif
                   </div>
@@ -127,7 +127,7 @@
                     </div>
                     <div class="row">
                       <div id="dialog-detail-campaign-created-date" class="col-12 h5">
-                        {{ date('d/m/Y - H:i', strtotime($campaign->created_at)) }}
+                        {{ date('d/m/Y - H:i', strtotime($campaign[0]->camp_created_at)) }}
                       </div>
                     </div>
                   </div>
@@ -171,7 +171,9 @@
                       <div class="col-12 label"><strong>Total Calls</strong></div>
                     </div>
                     <div class="row">
-                      <div id="dialog-detail-campaign-total-calls" class="col-12 h5">{{ number_format($campaign_info->total_calls, 0, ',', '.') }}</div>
+                      <div id="dialog-detail-campaign-total-calls" class="col-12 h5">
+                        {{ number_format($campaign_info->success + $campaign_info->no_answer + $campaign_info->busy + $campaign_info->failed, 0, ',', '.') }}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -184,6 +186,30 @@
                     </div>
                     <div class="row">
                       <div id="dialog-detail-campaign-success-calls" class="col-12 h5">{{ number_format($campaign_info->success, 0, ',', '.') }}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- no answer calls -->
+                <div class="row">
+                  <div class="col-md-12 mt-2">
+                    <div class="row">
+                      <div class="col-12 label"><strong>No Answer Calls</strong></div>
+                    </div>
+                    <div class="row">
+                      <div id="dialog-detail-campaign-noanswer-calls" class="col-12 h5">{{ number_format($campaign_info->no_answer, 0, ',', '.') }}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- busy calls -->
+                <div class="row">
+                  <div class="col-md-12 mt-2">
+                    <div class="row">
+                      <div class="col-12 label"><strong>Busy Calls</strong></div>
+                    </div>
+                    <div class="row">
+                      <div id="dialog-detail-campaign-busy-calls" class="col-12 h5">{{ number_format($campaign_info->busy, 0, ',', '.') }}</div>
                     </div>
                   </div>
                 </div>
@@ -208,17 +234,17 @@
             <table class="table table-hover">
               <thead>
                 <tr>
-                  @if($template_headers->count() > 0)
+                  @if($campaign->count() > 0)
                   <th scope="col" class="align-top">#</th>
 
-                  @foreach($template_headers AS $keyHeader => $valHeader)
+                  @foreach($campaign AS $keyHeader => $valHeader)
                   <th scope="col" class="align-top">
                     @php
                     $tempInfo = [];
-                    if ($valHeader->is_mandatory) $tempInfo[] = 'mandatory';
-                    if ($valHeader->is_unique) $tempInfo[] = 'unique';
-                    if ($valHeader->is_voice) $tempInfo[] = 'voice-' . $valHeader->voice_position;
-                    echo strtoupper($valHeader->name) . '<br><small class="fw-lighter">(' . implode(', ', $tempInfo) . ')</small>';
+                    if ($valHeader->th_is_mandatory) $tempInfo[] = 'mandatory';
+                    if ($valHeader->th_is_unique) $tempInfo[] = 'unique';
+                    if ($valHeader->th_is_voice) $tempInfo[] = 'voice-' . $valHeader->th_voice_position;
+                    echo strtoupper($valHeader->th_name) . '<br><small class="fw-lighter">(' . implode(', ', $tempInfo) . ')</small>';
                     @endphp
                   </th>
                   @endforeach
@@ -239,20 +265,20 @@
                     <tr>
                       <td class="text-end">{{ $row_number++ }}.</td>
                       @php $headerName = ''; @endphp
-                      @foreach($template_headers AS $keyHeader => $valHeader)
-                        @php $headerName = strtolower($valHeader->name); @endphp
+                      @foreach($campaign AS $keyHeader => $valHeader)
+                        @php $headerName = strtolower($valHeader->th_name); @endphp
 
-                        @if ($valHeader->column_type === 'string')
+                        @if ($valHeader->th_column_type === 'string')
                         <td>{{ $valueData->$headerName }}</td>
-                        @elseif ($valHeader->column_type === 'datetime')
+                        @elseif ($valHeader->th_column_type === 'datetime')
                         <td>{{ $valueData->$headerName ? date('d/m/Y H:i', strtotime($valueData->$headerName)) : '-' }}</td>
-                        @elseif ($valHeader->column_type === 'date')
+                        @elseif ($valHeader->th_column_type === 'date')
                         <td>{{ $valueData->$headerName ? date('d/m/Y', strtotime($valueData->$headerName)) : '-' }}</td>
-                        @elseif ($valHeader->column_type === 'time')
+                        @elseif ($valHeader->th_column_type === 'time')
                         <td>{{ $valueData->$headerName ? date('H:i:s', strtotime($valueData->$headerName)) : '-' }}</td>
-                        @elseif ($valHeader->column_type === 'handphone')
+                        @elseif ($valHeader->th_column_type === 'handphone')
                         <td>{{ substr($valueData->$headerName, 0, 4) . 'xxxxxx' . substr($valueData->$headerName, strlen($valueData->$headerName) - 3) }}</td>
-                        @elseif ($valHeader->column_type === 'numeric')
+                        @elseif ($valHeader->th_column_type === 'numeric')
                         <td class="text-end">{{ number_format($valueData->$headerName, 0, ',', '.') }}</td>
                         @endif
                       @endforeach
@@ -261,7 +287,7 @@
                       <td>{{ $valueData->call_response ? strtoupper($valueData->call_response) : '-' }}</td>
                       <td class="text-end">{{ number_format($valueData->total_calls, 0, ',', '.') }}</td>
                       <td>
-                        <a href="{{ route('contacts.show', [ 'id' => $valueData->id, 'campaignId' => $campaign->id ]) }}" class="btn btn-sm btn-info">Detail</a>
+                        <a href="{{ route('contacts.show', [ 'id' => $valueData->id, 'campaignId' => $valHeader->camp_id ]) }}" class="btn btn-sm btn-info">Detail</a>
                       </td>
                     </tr>
                   @endforeach  
@@ -269,17 +295,17 @@
               </tbody>
             </table>
 
-            {{ $contacts->links() }}
+            {{ !is_array($contacts) ? $contacts->links() : '' }}
 
             <div class="col-md-12 mt-4">
               <form id="form-campaign-export" class="g-3 needs-validation" method="POST" action="{{ url('campaigns/export') }}" enctype="multipart/form-data">
                 <a href="{{ url('campaigns') }}" class="btn btn-secondary btn-back">Close</a>
 
-                @if ($campaign->total_data > 0)
+                @if ($campaign[0]->camp_total_data > 0)
                 <button type="button" class="btn btn-success btn-export-as" id="btn-export-excel" data-export-as="excel">Export Excel</button>
                 <button type="button" class="btn btn-danger btn-export-as" id="btn-export-pdf" data-export-as="pdf">Export PDF</button>
                 <input type="hidden" id="campaign-export-type" name="export_type" value="">
-                <input type="hidden" id="campaign-export-key" name="campaign" value="{{ $campaign->id }}">
+                <input type="hidden" id="campaign-export-key" name="campaign" value="{{ $campaign[0]->camp_id }}">
                 {{ csrf_field() }}
                 @endif
                 
@@ -310,7 +336,7 @@
 
     $('.btn-campaign-status').click(function(e) {
       $('.btn-campaign-status').addClass('disabled');
-      startStopCampaign({{ $campaign->id }}, $(this).attr('data-status-value'));
+      startStopCampaign({{ $campaign[0]->camp_id }}, $(this).attr('data-status-value'));
     });
   });
 

@@ -129,45 +129,46 @@ class CampaignController extends Controller
 
     public function show(Request $request, $id)
     {
+        $data = array(
+            'row_number' => 0,
+            'campaign' => [],
+            'campaign_info' => [],
+            'contacts' => [],
+        );
+
         $campaign = Campaign::select(
-                'campaigns.id', 'campaigns.name', 'campaigns.total_data', 'campaigns.status', 'campaigns.created_at',
-                'campaigns.template_id', 'campaigns.reference_table'
+                'campaigns.id AS camp_id', 'campaigns.name AS camp_name', 'campaigns.total_data AS camp_total_data', 'campaigns.status AS camp_status',
+                'campaigns.created_at AS camp_created_at', 'campaigns.reference_table AS camp_ref_table',
+                'template_headers.name AS th_name', 'template_headers.column_type AS th_column_type', 'template_headers.is_mandatory AS th_is_mandatory',
+                'template_headers.is_unique AS th_is_unique', 'template_headers.is_voice AS th_is_voice', 'template_headers.voice_position AS th_voice_position'
             )
+            ->leftJoin('template_headers', 'campaigns.template_id' ,'=', 'template_headers.template_id')
             ->where('campaigns.id', '=', $id)
-            ->whereNull('deleted_at')
-            ->first();
+            ->whereNull('campaigns.deleted_at')
+            ->get();
         // dd($campaign);
 
-        $campaignInfo = DB::table($campaign->reference_table)
-            ->selectRaw("
-                SUM(" . $campaign->reference_table . ".total_calls) AS total_calls, 
-                (SELECT MIN(" . $campaign->reference_table . ".call_dial) FROM " . $campaign->reference_table . ") AS started,
-                (SELECT MAX(" . $campaign->reference_table . ".call_dial) FROM " . $campaign->reference_table . ") AS finished,
-                (SELECT COUNT(" . $campaign->reference_table . ".call_response) FROM " . $campaign->reference_table . " WHERE " . $campaign->reference_table . ".call_response = 'answered') AS success,
-                (SELECT COUNT(" . $campaign->reference_table . ".call_response) FROM " . $campaign->reference_table . " WHERE " . $campaign->reference_table . ".call_response = 'busy') AS busy,
-                (SELECT COUNT(" . $campaign->reference_table . ".call_response) FROM " . $campaign->reference_table . " WHERE " . $campaign->reference_table . ".call_response = 'no_answer') AS no_answer,
-                (SELECT COUNT(" . $campaign->reference_table . ".call_response) FROM " . $campaign->reference_table . " WHERE " . $campaign->reference_table . ".call_response = 'failed') AS failed,
-                (SELECT COUNT(" . $campaign->reference_table . ".id) FROM " . $campaign->reference_table . " WHERE " . $campaign->reference_table . ".call_dial IS NOT NULL) AS dialed_contacts
-            ")
-            ->get();
-        // dd($campaignInfo[0]);
+        if ($campaign->count() > 0) {
+            $referenceTable = $campaign[0]->camp_ref_table;
+            $campaignInfo = DB::table($referenceTable)
+                ->selectRaw("
+                    SUM(" . $referenceTable . ".total_calls) AS total_calls, 
+                    (SELECT MIN(" . $referenceTable . ".call_dial) FROM " . $referenceTable . ") AS started,
+                    (SELECT MAX(" . $referenceTable . ".call_dial) FROM " . $referenceTable . ") AS finished,
+                    (SELECT COUNT(" . $referenceTable . ".call_response) FROM " . $referenceTable . " WHERE " . $referenceTable . ".call_response = 'answered') AS success,
+                    (SELECT COUNT(" . $referenceTable . ".call_response) FROM " . $referenceTable . " WHERE " . $referenceTable . ".call_response = 'busy') AS busy,
+                    (SELECT COUNT(" . $referenceTable . ".call_response) FROM " . $referenceTable . " WHERE " . $referenceTable . ".call_response = 'no_answer') AS no_answer,
+                    (SELECT COUNT(" . $referenceTable . ".call_response) FROM " . $referenceTable . " WHERE " . $referenceTable . ".call_response = 'failed') AS failed,
+                    (SELECT COUNT(" . $referenceTable . ".id) FROM " . $referenceTable . " WHERE " . $referenceTable . ".call_dial IS NOT NULL) AS dialed_contacts
+                ")
+                ->get();
+            // dd($campaignInfo[0]);
 
-        $referenceTableColumns = Schema::getColumnListing($campaign->reference_table);
-        $templateHeaders = $this->getTemplateHeaders($campaign->template_id);
-        // $templateHeaders = array_intersect_key();
-        // dd($templateHeaders);
-
-        $contacts = DB::table($campaign->reference_table)->paginate(15);
-        $rowNumber = $contacts->firstItem();
-
-        $data = array(
-            'row_number' => $rowNumber,
-            'campaign' => $campaign,
-            'campaign_info' => $campaignInfo[0],
-            'template_headers' => $templateHeaders,
-            'columns' => $referenceTableColumns,
-            'contacts' => $contacts,
-        );
+            $data['contacts'] = DB::table($referenceTable)->paginate(15);
+            $data['row_number'] = $data['contacts']->firstItem();
+            $data['campaign'] = $campaign;
+            $data['campaign_info'] = $campaignInfo[0];
+        }
         // dd($data);
 
         return view('campaign.show', $data);
@@ -886,42 +887,53 @@ class CampaignController extends Controller
                             default: break;
                         }
                         
+                        // --- column A
                         $sheet->cell('A1', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue('NAME'); });
                         $sheet->cell('A2', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue($campaign[0]->camp_name); });
 
                         $sheet->cell('A4', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue('TOTAL DATA'); });
                         $sheet->cell('A5', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue($campaign[0]->camp_total_data); });
 
-                        $sheet->cell('A7', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue('STATUS'); });
-                        $sheet->cell('A8', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue($campaign[0]->camp_status); });
+                        $sheet->cell('A7', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue('CAMPAIGN PROGRESS (%)'); });
+                        $sheet->cell('A8', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue($progress); });
 
-                        $sheet->cell('A10', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue('CREATED DATE'); });
-                        $sheet->cell('A11', function($cell) use($campaign, $contacts, $campaignInfo, $progress) {
+                        $sheet->cell('A10', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue('STATUS'); });
+                        $sheet->cell('A11', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue($campaign[0]->camp_status); });
+
+                        // --- column C
+                        $sheet->cell('C1', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue('CREATED DATE'); });
+                        $sheet->cell('C2', function($cell) use($campaign, $contacts, $campaignInfo, $progress) {
                             $cell->setValue(date('d/m/Y - H:i', strtotime($campaign[0]->camp_created_at)));
                         });
-
-                        $sheet->cell('A13', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue('CAMPAIGN PROGRESS (%)'); });
-                        $sheet->cell('A14', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue($progress); });
-
-                        $sheet->cell('C1', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue('DATE STARTED'); });
-                        $sheet->cell('C2', function($cell) use($campaign, $contacts, $campaignInfo, $progress) {
+                        
+                        $sheet->cell('C4', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue('DATE STARTED'); });
+                        $sheet->cell('C5', function($cell) use($campaign, $contacts, $campaignInfo, $progress) {
                             $cell->setValue($campaignInfo->started ? date('d/m/Y - H:i', strtotime($campaignInfo->started)) : '-');
                         });
 
-                        $sheet->cell('C4', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue('DATE FINISHED'); });
-                        $sheet->cell('C5', function($cell) use($campaign, $contacts, $campaignInfo, $progress) {
+                        $sheet->cell('C7', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue('DATE FINISHED'); });
+                        $sheet->cell('C8', function($cell) use($campaign, $contacts, $campaignInfo, $progress) {
                             $cell->setValue(($campaignInfo->finished != '-') ? date('d/m/Y - H:i', strtotime($campaignInfo->finished)) : '-');
                         });
 
-                        $sheet->cell('C7', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue('TOTAL CALLS'); });
-                        $sheet->cell('C8', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue($campaignInfo->total_calls); });
+                        // --- column E
+                        $sheet->cell('E1', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue('TOTAL CALLS'); });
+                        $sheet->cell('E2', function($cell) use($campaign, $contacts, $campaignInfo, $progress) {
+                            $cell->setValue($campaignInfo->success + $campaignInfo->no_answer + $campaignInfo->busy + $campaignInfo->failed);
+                        });
 
-                        $sheet->cell('C10', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue('SUCCESS CALLS'); });
-                        $sheet->cell('C11', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue($campaignInfo->success); });
+                        $sheet->cell('E4', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue('SUCCESS CALLS'); });
+                        $sheet->cell('E5', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue($campaignInfo->success); });
 
-                        $sheet->cell('C13', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue('FAILED CALLS'); });
-                        $sheet->cell('C14', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue($campaignInfo->failed); });
-                        // --- create headers finished
+                        $sheet->cell('E7', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue('NO ANSWER CALLS'); });
+                        $sheet->cell('E8', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue($campaignInfo->no_answer); });
+
+                        $sheet->cell('E10', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue('BUSY CALLS'); });
+                        $sheet->cell('E11', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue($campaignInfo->busy); });
+
+                        $sheet->cell('E13', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue('FAILED CALLS'); });
+                        $sheet->cell('E14', function($cell) use($campaign, $contacts, $campaignInfo, $progress) { $cell->setValue($campaignInfo->failed); });
+
 
                         // --
                         // -- create template titles
@@ -945,14 +957,14 @@ class CampaignController extends Controller
                             $tempRowContent[] = 'CALL_RESPONSE';
                             $tempRowContent[] = 'TOTAL_CALLS';
 
-                            $sheet->row(16, $tempRowContent);
+                            $sheet->row(17, $tempRowContent);
                         }
-                        // --- create template title finished
+
 
                         // ---
                         // --- populate data into excel
                         // ---
-                        $excelRowNumber = 17;
+                        $excelRowNumber = 18;
                         $headerName = '';
                         $tempContactRow = [];
 
@@ -983,7 +995,6 @@ class CampaignController extends Controller
                                 $excelRowNumber++;
                             }
                         }
-                        // --- populate data finished
                     });
                 })->download('xlsx');
             }
