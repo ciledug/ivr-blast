@@ -15,7 +15,7 @@ class UserController extends Controller
 {
     public function __construct()
     {
-        $this->middleware('auth');
+        // $this->middleware('auth');
     }
     
     public function index()
@@ -30,9 +30,13 @@ class UserController extends Controller
             ')
             ->whereNotIn('users.id', [Auth::user()->id])
             ->orderBy('users.name', 'ASC')
-            ->groupBy('users.id')
-            ->paginate(15);
+            ->groupBy('users.id');
 
+        if (Auth::user()->username !== 'sadmin') {
+            $users->whereNotIn('users.username', ['sadmin']);
+        }
+
+        $users = $users->paginate(15);
         $rowNumber = $users->firstItem();
 
         return view('user.index', [

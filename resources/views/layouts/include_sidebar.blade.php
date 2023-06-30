@@ -12,6 +12,7 @@
             </a>
         </li>
     
+        @if (Auth::user()->username !== 'sadmin')
         <!-- campaign -->
         <li class="nav-item">
             @if (str_contains(Route::currentRouteName(), 'campaigns'))
@@ -23,6 +24,7 @@
                 <span>Campaigns</span>
             </a>
         </li>
+        @endif
 
         <!-- calllogs -->
         <li class="nav-item">
@@ -35,7 +37,7 @@
                 <span>Call Logs</span>
             </a>
         </li>
-    
+
         <!-- users -->
         <li class="nav-item">
             @if (str_contains(Route::currentRouteName(), 'users'))
