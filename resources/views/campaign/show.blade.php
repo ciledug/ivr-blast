@@ -266,7 +266,7 @@
                       <td class="text-end">{{ $row_number++ }}.</td>
                       @php $headerName = ''; @endphp
                       @foreach($campaign AS $keyHeader => $valHeader)
-                        @php $headerName = strtolower($valHeader->th_name); @endphp
+                        @php $headerName = strtolower(preg_replace('/\W+/i', '_', $valHeader->th_name)); @endphp
 
                         @if ($valHeader->th_column_type === 'string')
                         <td>{{ $valueData->$headerName }}</td>

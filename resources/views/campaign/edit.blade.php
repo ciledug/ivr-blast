@@ -247,7 +247,7 @@
                         <td class="text-end">{{ $row_number++ }}.</td>
 
                         @foreach($campaign AS $keyCampaign => $valCampaign)
-                          @php $headerName = strtolower($valCampaign->templ_header_name); @endphp
+                          @php $headerName = strtolower(preg_replace('/\W+/i', '_', $valCampaign->templ_header_name)); @endphp
 
                           @if ($valCampaign->templ_column_type === 'string') <td>{{ $valueData->$headerName }}</td>
                           @elseif ($valCampaign->templ_column_type === 'datetime') <td>{{ date('d/m/Y H:i:s', strtotime($valueData->$headerName)) }}</td>
@@ -388,12 +388,12 @@
 
                     @foreach($headers AS $keyHeader => $valHeader)
                       @php
-                      $tempHeaderName = strtolower($valHeader['col_name']);
+                      $tempHeaderName = strtolower(preg_replace('/\W+/i', '_', $valHeader['col_name']));
                       $tempHeaderType = $valHeader['col_type'];
                       @endphp
 
                       @if ($tempHeaderType === 'numeric')
-                    <td><span class="text-end">{{ number_format($valFailed->$tempHeaderName, 0, ',', '.') }}</span></td>
+                    <td class="text-end"><span>{{ number_format($valFailed->$tempHeaderName, 0, ',', '.') }}</span></td>
                       @else
                     <td>{{ $valFailed->$tempHeaderName }}</td>
                       @endif

@@ -146,6 +146,7 @@
 
   var typeOptions = '<option value=""></option>@foreach($column_types AS $keyColumn => $valColumn)<option value="{{ $valColumn->type }}">{{ $valColumn->name}}</option>@endforeach';
   var headerCount = @php echo isset($template_headers) ? count($template_headers) : '0'; @endphp;
+  var voiceSequenceList = [];
 
   function addColumn() {
     var tempRow = '<tr>';
@@ -189,6 +190,9 @@
     e.parent().parent().remove();
     --headerCount;
     checkHeaderCount();
+
+    var inputVoicePosition = $(e).parent().prev().children().first();
+    checkVoiceSequence(inputVoicePosition, false);
   };
 
   function checkHeaderCount() {
@@ -210,16 +214,43 @@
     if ($(e).is(':checked')) {
       $(e).next().val('on');
       if (isForVoicePos) {
-        $(inputVoicePosition).removeAttr('readonly').removeClass('disabled').val('0');
-        // $(inputVoicePosition).val('0');
+        checkVoiceSequence(inputVoicePosition, true);
       }
     }
     else {
       $(e).next().val('');
       if (isForVoicePos) {
-        $(inputVoicePosition).attr('readonly', 'readonly').addClass('disabled').val('');
-        // $(inputVoicePosition).val('');
+        checkVoiceSequence(inputVoicePosition, false);
       }
+    }
+  };
+
+  function checkVoiceSequence(e, isAddition) {
+    if (isAddition) {
+      $(e).val(voiceSequenceList.length + 1);
+      voiceSequenceList.push({
+        el: e, seq: voiceSequenceList.length + 1
+      });
+    }
+    else {
+      var tempList = [];
+      var seqValue = $(e).val();
+      
+      voiceSequenceList.map((v, k) => {
+        if (v.seq != seqValue) {
+          tempList.push(v);
+        }
+        else {
+          $(v.el).val('');
+        }
+      });
+
+      tempList.map((v, k) => {
+        v.seq = k + 1;
+        $(v.el).val(v.seq);
+      });
+
+      voiceSequenceList = tempList;
     }
   };
 

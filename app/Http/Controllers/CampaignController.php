@@ -35,7 +35,7 @@ class CampaignController extends Controller
 
     public function __construct()
     {
-        $this->middleware('auth');
+        // $this->middleware('auth');
     }
 
     public function index()
@@ -215,7 +215,7 @@ class CampaignController extends Controller
                 $tempHeaders = [];
                 $referenceTable = '';
                 foreach ($campaignData AS $keyCampaign => $valCampaign) {
-                    $tempHeaders[] = strtolower($valCampaign->templ_header_name);
+                    $tempHeaders[] = strtolower(preg_replace('/\W+/i', '_', $valCampaign->templ_header_name));
                     $referenceTable = $campaignData[$keyCampaign]->camp_reference_table;
                 }
                 
@@ -420,7 +420,8 @@ class CampaignController extends Controller
                             $campaignCreate->id,
                             $dataRows,
                             $request->template_reference,
-                            $reportHeaders
+                            $reportHeaders,
+                            $request->campaign_text_voice
                         );
 
                         $campaignCreate->total_data += count($dataRows) - count($existingContacts);
@@ -627,7 +628,8 @@ class CampaignController extends Controller
                         $campaign->camp_id,
                         $dataRows,
                         $postedTemplateReference,
-                        $reportHeaders
+                        $reportHeaders,
+                        $request->campaign_text_voice
                     );
                     // dd(count($newContacts));
                     // dd($existingContacts);
@@ -973,7 +975,7 @@ class CampaignController extends Controller
                                 $tempContactRow = [];
 
                                 foreach($campaign AS $keyHeader => $valHeader) {
-                                    $headerName = strtolower($valHeader->th_name);
+                                    $headerName = strtolower(preg_replace('/\W+/i', '_', $valHeader->th_name));
 
                                     switch ($valHeader->th_type) {
                                         case 'handphone':
@@ -1273,7 +1275,7 @@ class CampaignController extends Controller
     }
     */
 
-    private function saveValidContacts($campaignId, $dataRows, $referenceTable, $reportHeaders)
+    private function saveValidContacts($campaignId, $dataRows, $referenceTable, $reportHeaders, $textVoice)
     {
         ini_set('max_execution_time', 0);
 
@@ -1292,7 +1294,7 @@ class CampaignController extends Controller
         $insertRefTableCommand = '';
         if (count($reportHeaders)) {
             foreach ($reportHeaders  AS $keyHeader => $valHeader) {
-                $refColumns[] = strtolower($valHeader->name);
+                $refColumns[] = strtolower(preg_replace('/\W+/i', '_', $valHeader->name));
                 $refBindings[] = '?';
 
                 if ($valHeader->column_type == 'handphone') {
@@ -1346,7 +1348,7 @@ class CampaignController extends Controller
                 $phoneColumnName = '';
                 $first8Position = '';
                 foreach($reportHeaders  AS $keyHeader => $valHeader) {
-                    $headerName = strtolower($valHeader->name);
+                    $headerName = strtolower(preg_replace('/\W+/i', '_', $valHeader->name));
                     $tempContact[$headerName] = $valDataRows->$headerName;
 
                     if ($valHeader->column_type == 'handphone') {
@@ -1376,7 +1378,7 @@ class CampaignController extends Controller
                             $tempContact['extension']   = $sip[$rand]->extension;
                             $tempContact['callerid']    = $sip[$rand]->callerid;
                             */
-                            $tempContact['voice']       = Helpers::generateVoice($voiceColumns, $valDataRows);
+                            $tempContact['voice']       = ($textVoice != null) ? Helpers::generateVoice($textVoice, $voiceColumns, $valDataRows) : null;
                             
                             // ---
                             // --- insert ignore into DB and get the warnings if any

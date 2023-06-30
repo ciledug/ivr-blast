@@ -112,7 +112,7 @@ class Helpers
 		$headerName = '';
 
 		foreach ($voiceColumns AS $keyVoice => $valVoice) {
-			$headerName = strtolower($valVoice->name);
+			$headerName = strtolower(preg_replace('/\W+/i', '_', $valVoice->name));
 			switch ($valVoice->column_type) {
 				case 'numeric': $tempGenerates[] = self::generateNumber($dataRow->$headerName); break;
 				case 'date': $tempGenerates[] = self::generateDate($dataRow->$headerName); break;
@@ -121,7 +121,8 @@ class Helpers
 			$voiceHolders[] = '<voice-' . ($keyVoice + 1) . '>';
 		}
 
-		return str_replace($voiceHolders, $tempGenerates, $textVoice);
+		if ($textVoice) return str_replace($voiceHolders, $tempGenerates, $textVoice);
+		else return implode(' ', $tempGenerates);
 	}
 
 

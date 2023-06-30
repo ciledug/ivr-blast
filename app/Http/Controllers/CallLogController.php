@@ -64,7 +64,7 @@ class CallLogController extends Controller
 
                 foreach ($selectedCampaign AS $keyHeader => $valHeader) {
                     if ($valHeader->templ_is_mandatory || ($valHeader->tmpl_col_type === 'handphone')) {
-                        $mandatoryColumns[] = $tableReference . '.' . strtolower($valHeader->tmpl_header_name);
+                        $mandatoryColumns[] = $tableReference . '.' . strtolower(preg_replace('/\W+/i', '_', $valHeader->tmpl_header_name));
                     }
                 }
                 // dd($mandatoryColumns);
@@ -176,7 +176,7 @@ class CallLogController extends Controller
                             $tempRowContent = [];
 
                             foreach ($tempHeaders AS $keyHeader => $valHeader) {
-                                $columnName = strtolower($valHeader);
+                                $columnName = strtolower(preg_replace('/\W+/i', '_', $valHeader));
                                 $tempRowContent[] = strtoupper($row->$columnName);
                             }
     
@@ -235,7 +235,7 @@ class CallLogController extends Controller
             $mandatoryColumns = [];
 
             foreach ($theCampaign AS $keyHeader => $valHeader) {
-                $mandatoryColumns[] = strtolower($tableReference . '.' . $valHeader->th_name);
+                $mandatoryColumns[] = strtolower($tableReference . '.' . preg_replace('/W+/i', '_', $valHeader->th_name));
             }
             // dd($mandatoryColumns);
 

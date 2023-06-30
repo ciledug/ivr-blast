@@ -159,7 +159,7 @@
                   <td class="text-right">{{ $loop->iteration }}.</td>
                   @php
                   foreach ($campaign AS $keyCamp => $valCamp) {
-                    $headerName = strtolower($valCamp->th_name);
+                    $headerName = strtolower(preg_replace('/\W+/i', '_', $valCamp->th_name));
 
                     switch ($valCamp->th_type) {
                       case 'numeric':
