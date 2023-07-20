@@ -22,7 +22,7 @@
 
         <div class="card">
           <div class="card-body">
-            <form action="{{ route('calllogs') }}" method="GET" id="form-filter">
+            <form action="{{ route('calllogs.list') }}" method="GET" id="form-filter">
               {{ csrf_field() }}
               <div class="row mt-4">
                 <div class="col-md-6">Call Dial Date</div>
@@ -43,7 +43,7 @@
                     @if($startdate)
                     <div class="col-md-4">
                       {{-- <a href="{{ route('calllogs') }}" class="btn btn-outline-primary">Clear Date</a> --}}
-                      <a href="{{ route('calllogs', ['campaign' => $selectedCampaign[0]->camp_id]) }}" class="btn btn-outline-primary">Clear Date</a>
+                      <a href="{{ route('calllogs.list', ['campaign' => $selectedCampaign[0]->camp_id]) }}" class="btn btn-outline-primary">Clear Date</a>
                     </div>
                     @endif
                   </div>
@@ -113,15 +113,15 @@
                       @endif
                     @endforeach
 
-                    <td>{{ $valueCallLog->call_dial ? date('d/m/Y', strtotime($valueCallLog->call_dial)) : '' }}</td>
-                    <td>{{ $valueCallLog->call_connect ? date('H:i:s', strtotime($valueCallLog->call_connect)) : '' }}</td>
-                    <td>{{ $valueCallLog->call_disconnect ? date('H:i:s', strtotime($valueCallLog->call_disconnect)) : '' }}</td>
-                    <td class="text-end">{{ $valueCallLog->call_duration > 0 ? App\Helpers\Helpers::secondsToHms($valueCallLog->call_duration) : '' }}</td>
-                    <td>{{ strtoupper($valueCallLog->call_response) }}</td>
+                    <td>{{ $valueCallLog->cl_call_dial ? date('d/m/Y', strtotime($valueCallLog->cl_call_dial)) : '' }}</td>
+                    <td>{{ $valueCallLog->cl_call_connect ? date('H:i:s', strtotime($valueCallLog->cl_call_connect)) : '' }}</td>
+                    <td>{{ $valueCallLog->cl_call_disconnect ? date('H:i:s', strtotime($valueCallLog->cl_call_disconnect)) : '' }}</td>
+                    <td class="text-end">{{ $valueCallLog->cl_call_duration > 0 ? App\Helpers\Helpers::secondsToHms($valueCallLog->cl_call_duration) : '' }}</td>
+                    <td>{{ strtoupper($valueCallLog->cl_call_response) }}</td>
 
                     <td style="padding:4px 0;" class="text-center" >
-                      @if (!empty($valueCallLog->call_duration))
-                      <button type="button" class="btn btn-success btn-sm btn-play-recording" data-bs-toggle="modal" data-bs-target="#modal-play-recording" data-value="{{ $valueCallLog->call_recording }}">
+                      @if (!empty($valueCallLog->cl_call_duration))
+                      <button type="button" class="btn btn-success btn-sm btn-play-recording" data-bs-toggle="modal" data-bs-target="#modal-play-recording" data-value="{{ $valueCallLog->cl_call_recording }}">
                         <i class="bi bi-play-fill"></i> 
                       </button>
                       @endif
@@ -297,7 +297,7 @@
     $('#select-campaign-list').change(function() {
       $('#startdate, #enddate').val('');
       $('#modal-spinner').modal('show');
-      location.href = '{{ route('calllogs') }}/' + $(this).find(':selected').val();
+      location.href = '{{ route('calllogs.list') }}/' + $(this).find(':selected').val();
     });
   };
 

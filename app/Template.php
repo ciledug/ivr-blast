@@ -7,6 +7,6 @@ use Illuminate\Database\Eloquent\Model;
 class Template extends Model
 {
     protected $fillable = [
-        'name',
+        'name', 'reference_table', 'voice_text',
     ];
 }

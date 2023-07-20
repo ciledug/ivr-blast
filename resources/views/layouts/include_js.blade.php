@@ -21,6 +21,7 @@
 <script type="text/javascript">
     $(window).on('unload', function() {
         $('#modal-spinner').modal('hide');
+        $('#modal-progress').modal('hide');
     });
     
     function submitLogout(event) {

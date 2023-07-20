@@ -75,33 +75,59 @@
       <div class="col-lg-12">
 
         <!-- headers container -->
-        @php
-        $totalCalls = $campaignInfo ? ($campaignInfo->success + $campaignInfo->no_answer + $campaignInfo->busy + $campaignInfo->failed) : 0;
-        @endphp
-
         <div id="export-campaign-header">
           <table class="table table-hover" style="width:100%;">
             <tr>
-              <td style="width:33%;"><span style="font-weight:bold">Name</span><br>{{ $campaign[0]->camp_name or '' }}</td>
-              <td style="width:33%; padding-top:0.85em;"><span style="font-weight:bold">Created Date</span><br>{{ date('d/m/Y - H:i', strtotime($campaign[0]->camp_created_at)) }}</td>
+              <td style="width:33%;">
+                <span style="font-weight:bold">Name</span>
+                <br>{{ $campaign[0]->camp_name or '' }}
+              </td>
+
               <td style="width:33%; padding-top:0.85em;">
-                <span style="font-weight:bold">Total Calls</span><br>
-                {{ $totalCalls }}
+                <span style="font-weight:bold">Created Date</span>
+                <br>{{ date('d/m/Y - H:i', strtotime($campaign[0]->camp_created_at)) }}
+              </td>
+
+              <td style="width:33%; padding-top:0.85em;">
+                <span style="font-weight:bold">Total Calls</span>
+                <br>{{ number_format($campaignContactsInfo[0]->sum_total_calls, 0, ',', '.') }}
               </td>
             </tr>
-            <tr>
-              <td style="width:33%; padding-top:0.85em;"><span style="font-weight:bold">Total Data</span><br>{{ $campaign[0]->camp_total_data or '0' }}</td>
-              <td style="width:33%;"><span style="font-weight:bold">Date Started</span><br>{{ $campaignInfo->started ? date('d/m/Y - H:i', strtotime($campaignInfo->started)) : '-' }}</td>
-              <td style="width:33%; padding-top:0.85em;"><span style="font-weight:bold">Success Calls</span><br>{{ $campaignInfo->success or '0' }}</td>
-            </tr>
+
             <tr>
               <td style="width:33%; padding-top:0.85em;">
-                <span style="font-weight:bold">Campaign Progress (%)</span><br>
-                {{ number_format(($totalCalls / $campaign[0]->camp_total_data) * 100, 2, '.', ',') }}
+                <span style="font-weight:bold">Total Data</span>
+                <br>{{ number_format($campaign[0]->camp_total_data, 0, ',', '.') }}
               </td>
-              <td style="width:33%; padding-top:0.85em;"><span style="font-weight:bold">Date Finished</span><br>{{ $campaignInfo->finished ? date('d/m/Y - H:i', strtotime($campaignInfo->finished)) : '-' }}</td>
-              <td style="width:33%; padding-top:0.85em;"><span style="font-weight:bold">No Answer Calls</span><br>{{ $campaignInfo->no_answer or '0' }}</td>
+
+              <td style="width:33%;">
+                <span style="font-weight:bold">Date Started</span>
+                <br>{{ $campaignContactsInfo[0]->started ? date('d/m/Y - H:i', strtotime($campaignContactsInfo[0]->started)) : '-' }}
+              </td>
+
+              <td style="width:33%; padding-top:0.85em;">
+                <span style="font-weight:bold">Success Calls</span>
+                <br>{{ number_format($campaignContactsInfo[0]->success, 0, ',', '.') }}
+              </td>
             </tr>
+
+            <tr>
+              <td style="width:33%; padding-top:0.85em;">
+                <span style="font-weight:bold">Campaign Progress (%)</span>
+                <br>{{ number_format(($campaignContactsInfo[0]->completed_dials / $campaign[0]->camp_total_data) * 100, 2, '.', ',') }}
+              </td>
+
+              <td style="width:33%; padding-top:0.85em;">
+                <span style="font-weight:bold">Date Finished</span>
+                <br>{{ $campaignContactsInfo[0]->finished ? date('d/m/Y - H:i', strtotime($campaignContactsInfo[0]->finished)) : '-' }}
+              </td>
+
+              <td style="width:33%; padding-top:0.85em;">
+                <span style="font-weight:bold">No Answer Calls</span>
+                <br>{{ number_format($campaignContactsInfo[0]->no_answer, 0, '.', ',') }}
+              </td>
+            </tr>
+
             <tr>
               <td style="width:33%; padding-top:0.85em;">
                 <span style="font-weight:bold">Status</span><br>
@@ -115,13 +141,21 @@
                 }
                 @endphp
               </td>
+
               <td style="width:33%; padding-top:0.85em;"></td>
-              <td style="width:33%; padding-top:0.85em;"><span style="font-weight:bold">Busy Calls</span><br>{{ $campaignInfo->busy or '0' }}</td>
-              
+
+              <td style="width:33%; padding-top:0.85em;">
+                <span style="font-weight:bold">Busy Calls</span>
+                <br>{{ number_format($campaignContactsInfo[0]->busy, 0, '.', ',') }}
+              </td>
             </tr>
+
             <tr>
               <td colspan="2"></td>
-              <td style="width:33%; padding-top:0.85em;"><span style="font-weight:bold">Failed Calls</span><br>{{ $campaignInfo->failed or '0' }}</td>
+              <td style="width:33%; padding-top:0.85em;">
+                <span style="font-weight:bold">Failed Calls</span>
+                <br>{{ number_format($campaignContactsInfo[0]->failed, 0, '.', ',') }}
+              </td>
             </tr>
 
           </table>
@@ -147,7 +181,7 @@
 
             <tbody>
               @php $headerName = ''; @endphp
-              @foreach($contacts->chunk(300) AS $datacontact)
+              @foreach($campaignContactsInfo->chunk(300) AS $datacontact)
                 @foreach($datacontact AS $contact)
 
                 @if ($loop->iteration % 2 == 0)
@@ -176,9 +210,9 @@
                   }
                   @endphp
 
-                  <td>{{ $contact->call_dial ? date('d/m/Y - H:i', strtotime($contact->call_dial)) : '' }}</td>
-                  <td>{{ $contact->call_response ? strtoupper($contact->call_response) : '' }}</td>
-                  <td class="text-right" style="padding-right:10px;">{{ number_format($contact->total_calls, 0, ',', '.') }}</td>
+                  <td>{{ $contact->cont_call_dial ? date('d/m/Y - H:i', strtotime($contact->cont_call_dial)) : '' }}</td>
+                  <td>{{ $contact->cont_call_response ? strtoupper($contact->cont_call_response) : '' }}</td>
+                  <td class="text-right" style="padding-right:10px;">{{ number_format($contact->cont_total_calls, 0, ',', '.') }}</td>
 
                 </tr>
                 @endforeach

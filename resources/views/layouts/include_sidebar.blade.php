@@ -29,9 +29,9 @@
         <!-- calllogs -->
         <li class="nav-item">
             @if (str_contains(Route::currentRouteName(), 'calllogs'))
-            <a class="nav-link" href="{{ route('calllogs') }}">
+            <a class="nav-link" href="{{ route('calllogs.list') }}">
             @else
-            <a class="nav-link collapsed" href="{{ route('calllogs') }}">
+            <a class="nav-link collapsed" href="{{ route('calllogs.list') }}">
             @endif
                 <i class="bi bi-person"></i>
                 <span>Call Logs</span>

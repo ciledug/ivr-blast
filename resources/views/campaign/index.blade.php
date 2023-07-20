@@ -21,13 +21,13 @@
             <table id="table-campaign-list-container" class="table table-hover">
               <thead>
                 <tr>
-                  <th scope="col" width="40px">#</th>
-                  <th scope="col" width="160px">Date Created</th>
-                  <th scope="col">Name</th>
-                  <th scope="col" width="100px">Total Data</th>
-                  <th scope="col">Status</th>
-                  <th scope="col">Created By</th>
-                  <th scope="col" width="250px">Action</th>
+                  <th scope="col" class="align-top">#</th>
+                  <th scope="col" class="align-top">Date Created</th>
+                  <th scope="col" class="align-top">Name</th>
+                  <th scope="col" class="align-top">Total Data</th>
+                  <th scope="col" class="align-top">Status</th>
+                  <th scope="col" class="align-top">Created By</th>
+                  <th scope="col" class="align-top">Action</th>
                 </tr>
               </thead>
               
@@ -71,7 +71,7 @@
                       @if ($valueCampaign->status != 3)
                         @if ($valueCampaign->dialed_contacts == 0)
                           <a href="{{ route('campaigns.edit', ['id' => $valueCampaign->id]) }}" class="btn btn-sm btn-warning btn-modal-spinner">Edit</a>
-                          <a href="{{ route('campaigns.delete', ['id' => $valueCampaign->id]) }}" class="btn btn-sm btn-danger btn-modal-spinner">Delete</a>
+                          <a href="{{ route('campaigns.destroy', ['id' => $valueCampaign->id]) }}" class="btn btn-sm btn-danger btn-modal-spinner">Delete</a>
                         @endif
                       @endif
                     </td>

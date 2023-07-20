@@ -91,7 +91,6 @@ class Helpers
 		return trim($day).' '.trim($month).' '.trim($year);
 	}
 	
-	/*
 	static function generateVoice($data)
 	{
 		// data is array contain bill_date, due_date, nominal and filename to generate file voice
@@ -103,27 +102,27 @@ class Helpers
 		
 		return $fileVoice;
 	}
-	*/
 
-	static function generateVoice($textVoice, $voiceColumns, $dataRow)
+	/*
+	static function generateVoice($voiceColumns, $dataRow)
 	{
 		$voiceHolders = [];
 		$tempGenerates = [];
 		$headerName = '';
 
 		foreach ($voiceColumns AS $keyVoice => $valVoice) {
-			$headerName = strtolower(preg_replace('/\W+/i', '_', $valVoice->name));
-			switch ($valVoice->column_type) {
+			$headerName = strtolower(preg_replace('/\W+/i', '_', $valVoice->th_name));
+			switch ($valVoice->th_column_type) {
 				case 'numeric': $tempGenerates[] = self::generateNumber($dataRow->$headerName); break;
 				case 'date': $tempGenerates[] = self::generateDate($dataRow->$headerName); break;
 				default: $tempGenerates[] = $dataRow->$headerName; break;
 			}
 			$voiceHolders[] = '<voice-' . ($keyVoice + 1) . '>';
 		}
-
-		if ($textVoice) return str_replace($voiceHolders, $tempGenerates, $textVoice);
-		else return implode(' ', $tempGenerates);
+		
+		return implode(' || ', $tempGenerates);
 	}
+	*/
 
 
 	static function secondsToHms($seconds){

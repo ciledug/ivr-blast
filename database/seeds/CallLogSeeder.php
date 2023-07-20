@@ -3,6 +3,8 @@
 use Illuminate\Database\Seeder;
 use Carbon\Carbon;
 use Faker\Factory as Faker;
+
+use App\CallLog;
 use App\Campaign;
 use App\Contact;
 
@@ -28,13 +30,13 @@ class CallLogSeeder extends Seeder
         $callConnect = null;
         $callDisconnect = null;
         $callDuration = null;
-        $callResponse = null;
         $callRecording = null;
+        $callResponse = null;
 
         // ---
         // --- insert dummy for campaign-id 2, running campaign
         // ---
-        $campaign = Campaign::select('reference_table')->where('id', 2)->first();
+        $campaign = Campaign::select('id', 'reference_table')->where('id', 2)->first();
         $referenceTable = strtolower($campaign->reference_table);
         $randConnect = 0;
         $tempContactCount = 0;
@@ -50,22 +52,23 @@ class CallLogSeeder extends Seeder
             $contactId = $faker->numberBetween(1, 100);
             $callResponse = 'failed';
 
-            $contact = DB::table($referenceTable)->select(
-                    $referenceTable . '.id', $referenceTable . '.due_date', $referenceTable . '.total_calls',
-                    $referenceTable . '_call_logs.call_dial', $referenceTable . '_call_logs.call_response'
+            $contact = Contact::select(
+                    'contacts.id AS con_id', 'contacts.total_calls AS con_total_calls', 'contacts.call_response AS con_call_response',
+                    'contacts.call_dial AS con_call_dial',
+                    $referenceTable . '.due_date AS con_due_date' 
                 )
-                ->leftJoin($referenceTable . '_call_logs', $referenceTable . '.id', '=', $referenceTable . '_call_logs.contact_id')
+                ->leftJoin($referenceTable, 'contacts.id', '=', $referenceTable. '.contact_id')
                 ->where($referenceTable . '.id', $contactId)
                 ->get();
             // dd($contact);
             $tempContactCount = $contact->count();
 
-            if (($tempContactCount < 3) && ($contact[$tempContactCount - 1]->call_response !== 'answered')) {
+            if (($tempContactCount < 3) && ($contact[$tempContactCount - 1]->con_call_response !== 'answered')) {
                 $contact = $contact[$tempContactCount - 1];
 
-                $tempDialDate = $contact->due_date . ' ' . date('H:i:s');
-                if ($contact->call_dial) {
-                    $tempDialDate = Carbon::createFromFormat('Y-m-d H:i:s', $contact->call_dial)->format('Y-m-d') . ' ' . date('H:i:s');
+                $tempDialDate = $contact->con_due_date . ' ' . date('H:i:s');
+                if ($contact->con_call_dial) {
+                    $tempDialDate = Carbon::createFromFormat('Y-m-d H:i:s', $contact->con_call_dial)->format('Y-m-d') . ' ' . date('H:i:s');
                 }
 
                 $callDial = Carbon::createFromFormat('Y-m-d H:i:s', $tempDialDate)->addHours($tempContactCount);
@@ -84,25 +87,24 @@ class CallLogSeeder extends Seeder
                     }
                 }
                 
-                DB::table($referenceTable . '_call_logs')->insert([
-                    'contact_id' => $contact->id,
+                CallLog::insert([
+                    'campaign_id' => $campaign->id,
+                    'contact_id' => $contact->con_id,
                     'call_dial' => $callDial->format('Y-m-d H:i:s'),
                     'call_connect' => empty($callConnect) ? null : $callConnect->format('Y-m-d H:i:s'),
                     'call_disconnect' => empty($callDisconnect) ? null : $callDisconnect->format('Y-m-d H:i:s'),
                     'call_duration' => $callDuration,
-                    'call_response' => $callResponse,
                     'call_recording' => $callRecording,
+                    'call_response' => $callResponse,
                     'created_at' => Carbon::now('Asia/Jakarta')->format('Y-m-d H:i:s'),
                     'updated_at' => Carbon::now('Asia/Jakarta')->format('Y-m-d H:i:s'),
                 ]);
 
-                DB::table($referenceTable)
-                    ->where('id', $contact->id)
-                    ->update([
-                        'total_calls' => is_numeric($contact->total_calls) ? $contact->total_calls + 1 : 1,
-                        'call_dial' => $callDial->format('Y-m-d H:i:s'),
-                        'call_response' => !empty($callResponse) ? $callResponse : null,
-                    ]);
+                $contact->id = $contact->con_id;
+                $contact->total_calls = is_numeric($contact->con_total_calls) ? $contact->con_total_calls + 1 : 1;
+                $contact->call_dial = $callDial->format('Y-m-d H:i:s');
+                $contact->call_response = !empty($callResponse) ? $callResponse : null;
+                $contact->save();
             }
             else {
                 $i--;
@@ -116,14 +118,18 @@ class CallLogSeeder extends Seeder
         // ---
         // --- insert dummy for campaign-id 3, finished campaign
         // ---
-        $campaign = Campaign::where('id', 3)->first();
+        $campaign = Campaign::select('id', 'reference_table')->where('id', 3)->first();
         $referenceTable = strtolower($campaign->reference_table);
-        $contacts = DB::table($referenceTable)->get();
+        $contacts = Contact::select(
+                'contacts.id AS cont_id', 'contacts.call_dial'
+            )
+            ->leftJoin($referenceTable, 'contacts.id', '=', $referenceTable . '.contact_id')
+            ->where('contacts.campaign_id', $campaign->id)
+            ->get();
         $isDummyFinished = false;
 
         foreach ($contacts AS $keyContact => $valContact) {
-            $contactId = $faker->numberBetween(1, 100);
-            $callDial = '';
+            $callDial = ($valContact->call_dial == null) ? Carbon::createFromFormat('Y-m-d H:i:s', date('Y-m-d H:i:s')) : $valContact->call_dial;
             $callConnect = null;
             $callDisconnect = null;
             $callDuration = null;
@@ -133,7 +139,7 @@ class CallLogSeeder extends Seeder
 
             for ($i=1; $i<=3; $i++) {
                 if (!$isDummyFinished) {
-                    $callDial = Carbon::createFromFormat('Y-m-d H:i:s', $valContact->due_date . ' ' . date('H:i:s'))->addSeconds($faker->numberBetween(1, 21));
+                    $callDial = $callDial->addMinutes($faker->numberBetween(60, 121));
                     $randConnect = $faker->numberBetween(0, 10);
         
                     if ($randConnect % 2 == 0) {
@@ -151,25 +157,24 @@ class CallLogSeeder extends Seeder
                         }
                     }
 
-                    DB::table($referenceTable . '_call_logs')->insert([
-                        'contact_id' => $valContact->id,
+                    CallLog::insert([
+                        'campaign_id' => $campaign->id,
+                        'contact_id' => $valContact->cont_id,
                         'call_dial' => $callDial->format('Y-m-d H:i:s'),
                         'call_connect' => empty($callConnect) ? null : $callConnect->format('Y-m-d H:i:s'),
                         'call_disconnect' => empty($callDisconnect) ? null : $callDisconnect->format('Y-m-d H:i:s'),
                         'call_duration' => $callDuration,
-                        'call_response' => $callResponse,
                         'call_recording' => $callRecording,
+                        'call_response' => $callResponse,
                         'created_at' => Carbon::now('Asia/Jakarta')->format('Y-m-d H:i:s'),
                         'updated_at' => Carbon::now('Asia/Jakarta')->format('Y-m-d H:i:s'),
                     ]);
-        
-                    DB::table($referenceTable)
-                        ->where('id', $valContact->id)
-                        ->update([
-                            'total_calls' => $i,
-                            'call_dial' => $callDial->format('Y-m-d H:i:s'),
-                            'call_response' => $callResponse,
-                        ]);
+
+                    $valContact->id = $valContact->cont_id;
+                    $valContact->total_calls = $i;
+                    $valContact->call_dial = $callDial->format('Y-m-d H:i:s');
+                    $valContact->call_response = $callResponse;
+                    $valContact->save();
                 }
             }
         }

@@ -26,8 +26,6 @@ class CreateCampaignTable extends Migration
             $table->tinyInteger('created_by')->unsigned();
             $table->tinyInteger('template_id')->unsigned();
             $table->string('reference_table', 100);
-            $table->text('text_voice')->nullable();
-            $table->string('voice_gender')->nullable()->comment('male_normal, male_strong, female_normal, female_strong');
             $table->timestamps();
             $table->softDeletes();
         });

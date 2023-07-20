@@ -36,12 +36,17 @@
               Add Template
             </h5>
             
-            <form id="form-create-row-template" class="row g-3 needs-validation" method="POST" action="{{ route('templates.store') }}" enctype="multipart/form-data" novalidate>
+            <form id="form-create-row-template"
+              method="POST" action="{{ route('templates.store') }}"
+              enctype="multipart/form-data"
+              class="row g-3 needs-validation"
+              novalidate
+            >
+              <!-- template name -->
               <div class="col-12">
-                <div class="form-floating">
-                  <input type="text" class="form-control" id="input-template-name" name="name" minlength="5" maxlength="20" placeholder="Template name" required>
-                  <label for="input-template-name" class="form-label">Template Name (5-20 chars)</label>
-                </div>
+                <label for="input-template-name" class="form-label">Template Name (5-30 chars)</label>
+                <input type="text" class="form-control" id="input-template-name" name="input_template_name" minlength="5" maxlength="30" placeholder="Template name" required>
+
                 @if ($errors->has('name'))
                 <div class="invalid-feedback mt-2" style="display:block">
                     <strong>{{ $errors->first('name') }}</strong>
@@ -49,6 +54,13 @@
                 @endif
               </div>
 
+              <!-- template voice text -->
+              <div class="col-12">
+                <label class="form-label" for="campaign-text-voice">Voice Text</label>
+                <textarea id="input-template-voice-text" name="input_template_voice_text" class="form-control" rows="6" placeholder="Template text message"></textarea>
+              </div>
+
+              <!-- template headers -->
               <div class="col-12 mt-5">
                 <a href="#" id="btn-add-column" class="btn btn-primary btn-user-action">
                   Add Column
@@ -123,6 +135,7 @@
               <div class="col-md-12 mt-4">
                 <button type="button" class="btn btn-secondary btn-back">Cancel</button>
                 <button type="submit" class="btn btn-outline-primary disabled" id="btn-submit-template">Save</button>&nbsp;
+                <input type="hidden" id="input-reference-table" name="input_reference_table" value="">
                 {{ csrf_field() }}
                 
                 <div id="submit-spinner-save-template" class="spinner-border spinner-border-sm text-primary spinner-progress" role="status">
@@ -147,6 +160,7 @@
   var typeOptions = '<option value=""></option>@foreach($column_types AS $keyColumn => $valColumn)<option value="{{ $valColumn->type }}">{{ $valColumn->name}}</option>@endforeach';
   var headerCount = @php echo isset($template_headers) ? count($template_headers) : '0'; @endphp;
   var voiceSequenceList = [];
+  var replacePattern = /\W+/ig;
 
   function addColumn() {
     var tempRow = '<tr>';
@@ -254,6 +268,12 @@
     }
   };
 
+  function fillInputTemplateReference(e) {
+    var today = new Date();
+    var templateName = $('#input-template-name').val().toLowerCase().replaceAll(replacePattern, '_');
+    $('#input-reference-table').val(templateName);
+  };
+
   $(document).ready(function() {
     $("#table-header-list-container").sortable({
       items: 'tr'
@@ -278,6 +298,10 @@
     $('.spinner-progress').hide();
     $('.btn-back').click(function(e) {
       window.history.back();
+    });
+
+    $('#input-template-name').on("keyup", function(e) {
+      fillInputTemplateReference(e);
     });
 
     checkHeaderCount();

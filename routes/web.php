@@ -1,5 +1,6 @@
 <?php
 use App\Campaign;
+
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -21,31 +22,10 @@ Route::group(
         // Route::get('/home', 'HomeController@index')->name('home');
         Route::get('/dashboard', "DashboardController@index")->name('dashboard');
         Route::get('/dashboard/stream', 'DashboardController@stream')->name('dashboard.stream');
-
-        Route::prefix('campaigns')->group(function() {
-            Route::get('/', "CampaignController@index")->name('campaigns');
-            Route::get('create', "CampaignController@create")->name('campaigns.create');
-            Route::get('template/{templateId}', "CampaignController@downloadTemplate")->name('campaigns.template');
-            Route::get('importprogress', 'CampaignController@importProgress')->name('campaigns.importprogress');
-            Route::get('{id}', "CampaignController@show")->name('campaigns.show');
-            Route::get('{id}/edit', "CampaignController@edit")->name('campaigns.edit');
-            Route::get('{id}/delete', "CampaignController@delete")->name('campaigns.delete');
-            
-            Route::post('/', 'CampaignController@store')->name('campaigns.store');
-            Route::post('export', 'CampaignController@exportData')->name('campaigns.export');
-            Route::post('export/failed', 'CampaignController@exportFailedContacts')->name('campaigns.export.failed');
-
-            Route::put('/', 'CampaignController@update')->name('campaigns.update');
-            Route::put('startstop', 'CampaignController@updateStartStop')->name('campaigns.update.startstop');
-
-            Route::delete('/', 'CampaignController@destroy')->name('campaigns.destroy');
-        });
-
-        Route::prefix('calllogs')->group(function() {
-            Route::get('/', 'CallLogController@index')->name('calllogs');
-            Route::get('/recording', 'CallLogController@recording')->name('calllogs.recording');
-            Route::post('export', 'CallLogController@exportData')->name('calllogs.export');
-        });
+        
+        Route::post('export', 'CampaignController@exportData')->name('campaigns.export');
+        Route::put('startstop', 'CampaignController@updateStartStop')->name('campaigns.update.startstop');
+        Route::resource('campaigns', 'CampaignController');
         
         Route::prefix('users')->group(function() {
             Route::get('/', "UserController@index")->name('users');
@@ -67,11 +47,40 @@ Route::group(
             Route::put('password', 'AccountController@updatePassword')->name('account.update.password');
         });
 
-        Route::prefix('contacts')->group(function() {
-            // Route::get('{id}', 'ContactController@show')->name('contacts.show');
-            Route::get('{id}/{campaignId}', 'ContactController@show')->name('contacts.show');
+        Route::get('/calllogs/list', 'CallLogController@callLogs')->name('calllogs.list');
+        Route::post('/calllogs/export', 'CallLogController@exportData')->name('calllogs.export');
+        Route::resource('calllogs', 'CallLogController');
+
+        Route::resource('contacts', 'ContactController');
+        
+        Route::get('templates/download/{id}', 'TemplateController@download')->name('templates.download');
+        Route::resource('templates', 'TemplateController');
+
+        /*
+        Route::prefix('campaigns')->group(function() {
+            Route::get('/', "CampaignController@index")->name('campaigns');
+            Route::get('create', "CampaignController@create")->name('campaigns.create');
+            Route::get('template/{templateId}', "CampaignController@downloadTemplate")->name('campaigns.template');
+            Route::get('importprogress', 'CampaignController@importProgress')->name('campaigns.importprogress');
+            Route::get('{id}', "CampaignController@show")->name('campaigns.show');
+            Route::get('{id}/edit', "CampaignController@edit")->name('campaigns.edit');
+            Route::get('{id}/delete', "CampaignController@delete")->name('campaigns.delete');
+            
+            Route::post('/', 'CampaignController@store')->name('campaigns.store');
+            Route::post('export', 'CampaignController@exportData')->name('campaigns.export');
+            Route::post('export/failed', 'CampaignController@exportFailedContacts')->name('campaigns.export.failed');
+
+            Route::put('/', 'CampaignController@update')->name('campaigns.update');
+            Route::put('startstop', 'CampaignController@updateStartStop')->name('campaigns.update.startstop');
+
+            Route::delete('/', 'CampaignController@destroy')->name('campaigns.destroy');
         });
         
-        Route::resource('templates', 'TemplateController');
+        Route::prefix('calllogs')->group(function() {
+            Route::get('/', 'CallLogController@index')->name('calllogs');
+            Route::get('/recording', 'CallLogController@recording')->name('calllogs.recording');
+            Route::post('export', 'CallLogController@exportData')->name('calllogs.export');
+        });
+        */
     }
 );

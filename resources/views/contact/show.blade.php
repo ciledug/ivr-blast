@@ -26,19 +26,19 @@
             </h5>
 
             <div class="row">
-              @foreach($campaign_headers AS $keyHeader => $valHeader)
-                @php $headerName = strtolower(preg_replace('/\W+/i', '_', $valHeader->templ_header_name)); @endphp
+              @foreach($contact_headers AS $keyHeader => $valHeader)
+                @php $headerName = strtolower(preg_replace('/\W+/i', '_', $valHeader->th_name)); @endphp
 
                 <div class="col-lg-4 col-md-6 mt-2">
                   <div class="row">
-                    <div class="col-12 label fw-bold">{{ strtoupper($headerName) }}</div>
+                    <div class="col-12 label fw-bold">{{ $valHeader->th_name }}</div>
                   </div>
                   <div class="row">
                     <div class="col-12 h5">
-                      @if ($valHeader->templ_column_type === 'numeric') {{ number_format($contact[0]->$headerName, 0, ',', '.') }}
-                      @elseif ($valHeader->templ_column_type === 'handphone')
-                        {{ substr($contact[0]->$headerName, 0, 4) . 'xxxxxx' . substr($contact[0]->$headerName, strlen($contact[0]->$headerName) - 3) }}
-                      @else {{ $contact[0]->$headerName }}
+                      @if ($valHeader->th_column_type === 'numeric') {{ number_format($call_logs_content[0]->$headerName, 0, ',', '.') }}
+                      @elseif ($valHeader->th_column_type === 'handphone')
+                        {{ substr($call_logs_content[0]->$headerName, 0, 4) . 'xxxxxx' . substr($call_logs_content[0]->$headerName, strlen($call_logs_content[0]->$headerName) - 3) }}
+                      @else {{ $call_logs_content[0]->$headerName }}
                       @endif
                     </div>
                   </div>
@@ -69,19 +69,19 @@
                   </thead>
 
                   <tbody>
-                  @foreach($contact as $logs)
-                    @if ($logs->call_logs_created_at)
+                  @foreach($call_logs_content as $logs)
+                    @if ($logs->cl_created_at)
                       <tr>
-                        <td>{{ date('d/m/Y', strtotime($logs->call_dial)) }}</td>
-                        <td>{{ date('H:i:s', strtotime($logs->call_dial)) }}</td>
-                        <td>{{ $logs->call_connect ? date('H:i:s', strtotime($logs->call_connect)) : '' }}</td>
-                        <td>{{ $logs->call_disconnect ? date('H:i:s', strtotime($logs->call_disconnect)) : '' }}</td>
-                        <td>{{ $logs->call_duration > 0 ? App\Helpers\Helpers::secondsToHms($logs->call_duration) : '' }}</td>
-                        <td>{{ strtoupper($logs->call_response) }}</td>
+                        <td>{{ date('d/m/Y', strtotime($logs->cl_call_dial)) }}</td>
+                        <td>{{ date('H:i:s', strtotime($logs->cl_call_dial)) }}</td>
+                        <td>{{ $logs->cl_call_connect ? date('H:i:s', strtotime($logs->cl_call_connect)) : '' }}</td>
+                        <td>{{ $logs->cl_call_disconnect ? date('H:i:s', strtotime($logs->cl_call_disconnect)) : '' }}</td>
+                        <td>{{ $logs->cl_call_durations > 0 ? App\Helpers\Helpers::secondsToHms($logs->cl_call_durations) : '' }}</td>
+                        <td>{{ strtoupper($logs->cl_call_response) }}</td>
 
                         <td style="text-align: center;padding:4px 0px">
-                          @if($logs->call_duration > 0)
-                            <button type="button" class="btn btn-sm btn-success btn-play-recording" data-bs-toggle="modal" data-bs-target="#modal-play-recording" data-value="{{ $logs->call_recording }}">
+                          @if($logs->cl_call_durations > 0)
+                            <button type="button" class="btn btn-sm btn-success btn-play-recording" data-bs-toggle="modal" data-bs-target="#modal-play-recording" data-value="{{ $logs->cl_call_recording }}">
                               <i class="bi bi-play-fill"></i> 
                             </button>
                           @endif

@@ -3,265 +3,123 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
+
 use App\Campaign;
 use App\Contact;
-use App\CallLog;
-use Carbon\Carbon;
 
 class ContactController extends Controller
 {
-    public function __construct()
-    {
-        $this->middleware('auth');
-    }
-    
+    /**
+     * Display a listing of the resource.
+     *
+     * @return \Illuminate\Http\Response
+     */
     public function index()
     {
+        //
     }
 
-    /*
-    public function show(Request $request, $id)
+    /**
+     * Show the form for creating a new resource.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function create()
     {
-        $contact = Contact::find($id);
-        $dataLogs = CallLog::where('contact_id', $contact->id)->orderBy('id', 'ASC')->get();
-
-        return view('contact.show', compact('contact', 'dataLogs'));
+        //
     }
-    */
 
-    public function show(Request $request, $id, $campaignId)
+    /**
+     * Store a newly created resource in storage.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function store(Request $request)
     {
-        $campaignHeaders = Campaign::select(
-                'campaigns.template_id', 'campaigns.reference_table',
-                'template_headers.name AS templ_header_name', 'template_headers.column_type AS templ_column_type'
+        //
+    }
+
+    /**
+     * Display the specified resource.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function show($id)
+    {
+        $tempContent = [];
+
+        $contactHeaders = Contact::select(
+                'contacts.id AS cont_id', 'contacts.phone AS cont_phone', 'contacts.total_calls AS cont_total_calls', 'contacts.nominal AS cont_nominal',
+                'campaigns.id AS camp_id', 'campaigns.template_id AS camp_templ_id', 'campaigns.reference_table AS camp_reference_table',
+                'template_headers.name AS th_name', 'template_headers.column_type AS th_column_type', 'template_headers.is_mandatory AS th_is_mandatory',
+                'template_headers.is_unique AS th_is_unique', 'template_headers.is_voice AS th_is_voice', 'template_headers.voice_position AS th_voice_position'
             )
+            ->leftJoin('campaigns', 'contacts.campaign_id', '=', 'campaigns.id')
             ->leftJoin('template_headers', 'campaigns.template_id', '=', 'template_headers.template_id')
-            ->where('campaigns.id', $campaignId)
+            ->where('contacts.id', $id)
             ->whereNull('campaigns.deleted_at')
+            ->groupBy('template_headers.id')
             ->get();
-        // dd($campaignHeaders);
+        // dd($contactHeaders);
 
-        $referenceTable = $campaignHeaders[0]->reference_table;
+        if ($contactHeaders->count() > 0) {
+            $referenceTable = $contactHeaders[0]->camp_reference_table;
 
-        $contact = DB::table($referenceTable)
-            ->select($referenceTable . '.*', $referenceTable . '_call_logs.*', $referenceTable . '_call_logs.created_at AS call_logs_created_at')
-            ->leftJoin($referenceTable . '_call_logs', $referenceTable . '.id', '=', $referenceTable . '_call_logs.contact_id')
-            ->where($referenceTable . '.id', $id)
-            ->orderBy($referenceTable . '_call_logs.id', 'DESC')
-            ->get();
-        // dd($contact);
+            $callLogsContent = DB::table($referenceTable)
+                ->select(
+                    $referenceTable . '.*',
+                    'call_logs.call_dial AS cl_call_dial', 'call_logs.call_connect AS cl_call_connect', 'call_logs.call_disconnect AS cl_call_disconnect',
+                    'call_logs.call_duration AS cl_call_durations', 'call_logs.call_recording AS cl_call_recording', 'call_logs.call_response AS cl_call_response',
+                    'call_logs.created_at AS cl_created_at'
+                )
+                ->leftJoin('call_logs', $referenceTable . '.contact_id', '=', 'call_logs.contact_id')
+                ->where($referenceTable . '.campaign_id', $contactHeaders[0]->camp_id)
+                ->where($referenceTable . '.contact_id', $contactHeaders[0]->cont_id)
+                ->orderBy('call_logs.id', 'DESC')
+                ->get();
+            // dd($callLogsContent);
+        }
 
         return view('contact.show', [
-            'campaign_headers' => $campaignHeaders,
-            'contact' => $contact,
+            'contact_headers' => $contactHeaders,
+            'call_logs_content' => $callLogsContent,
         ]);
     }
 
-    public function contactList(Request $request, $campaign) {
-        $campaign = Str::replaceFirst('_', '', $campaign);
-
-        $returnedCode = 500;
-        $command = Contact::select(DB::raw('
-                account_id,
-                contacts.name AS name,
-                phone,
-                DATE_FORMAT(bill_date, "%d/%m/%Y") AS bill_date,
-                DATE_FORMAT(due_date, "%d/%m/%Y") AS due_date,
-                IF (total_calls IS NULL, 0, total_calls) AS total_calls,
-                FORMAT(nominal, 0) AS nominal,
-                DATE_FORMAT(call_dial, "%d/%m/%Y %H:%i:%s") AS call_dial,
-                CONCAT(UCASE(LEFT(call_response, 1)), SUBSTRING(call_response, 2)) AS call_response
-            '))
-            ->leftJoin('campaigns', 'campaign_id', '=', 'campaigns.id')
-            ->where('campaigns.unique_key', $campaign);
-
-        $contactList = array();
-
-        $returnedResponse = array(
-            'code' => $returnedCode,
-            'data' => $command->get()
-        );
-
-        return response()->json($returnedResponse);
+    /**
+     * Show the form for editing the specified resource.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function edit($id)
+    {
+        //
     }
 
-    public function contactListAjax(Request $request) {
-        $ORDERED_COLUMNS = ['account_id', 'name', 'phone', 'bill_date', 'due_date', 'total_calls', 'nominal', 'call_dial', 'call_response'];
-        $ORDERED_BY = ['desc', 'asc'];
-        $COLUMN_IDX = is_numeric($request->order[0]['column']) ? $request->order[0]['column'] : 0;
-        $START = is_numeric($request->start) ? (int) $request->start : 0;
-        $LENGTH = is_numeric($request->length) ? (int) $request->length : 10;
-        $SEARCH_VALUE = !empty($request->search['value']) ? $request->search['value'] : '';
-
-        $campaign = Str::replaceFirst('_', '', $request->campaign);
-        $campaign = Campaign::where('unique_key', '=', $campaign)->first();
-
-        $recordsTotalQuery = 0;
-        $contactList = [];
-
-        if ($campaign) {
-            $query = Contact::select(DB::raw('
-                    id,
-                    account_id,
-                    contacts.name AS name,
-                    phone,
-                    DATE_FORMAT(bill_date, "%d/%m/%Y") AS bill_date,
-                    DATE_FORMAT(due_date, "%d/%m/%Y") AS due_date,
-                    IF (total_calls IS NULL, 0, total_calls) AS total_calls,
-                    FORMAT(nominal, 0) AS nominal
-                '))
-                ->where('campaign_id', '=', $campaign->id);
-
-            if (!empty($SEARCH_VALUE)) {
-                $query->where(function($q) use($SEARCH_VALUE) {
-                    $q->where('contacts.account_id', 'LIKE', '%' . $SEARCH_VALUE . '%')
-                        ->orWhere('contacts.name', 'LIKE', '%' . $SEARCH_VALUE . '%')
-                        ->orwhere('contacts.phone', 'LIKE', '%' . $SEARCH_VALUE . '%')
-                        ->orwhere('bill_date', 'LIKE', '%' . $SEARCH_VALUE . '%')
-                        ->orwhere('due_date', 'LIKE', '%' . $SEARCH_VALUE . '%')
-                        ->orwhere('nominal', 'LIKE', '%' . $SEARCH_VALUE . '%')
-                        ->orwhere('call_dial', 'LIKE', '%' . $SEARCH_VALUE . '%');
-                });
-            }
-
-            if (in_array($request->order[0]['dir'], $ORDERED_BY)) {
-                $query->orderBy($ORDERED_COLUMNS[$COLUMN_IDX], $request->order[0]['dir']);
-            }
-            $filteredData = $query->get();
-            $contactList = $query->offset($START)->limit($LENGTH)->get();
-
-            foreach ($contactList AS $keyContact => $valueContact) {
-                $contactList[$keyContact]->call_dial = '-';
-                $contactList[$keyContact]->call_response = '-';
-                $tempCallLog = CallLog::select('call_dial', 'call_response')
-                    ->where('contact_id', '=', $valueContact->id)
-                    ->orderBy('id', 'DESC')
-                    ->first();
-                if ($tempCallLog) {
-                    $contactList[$keyContact]->call_dial = $tempCallLog->call_dial;
-                    $contactList[$keyContact]->call_response = ucwords($tempCallLog->call_response);
-                }
-            }
-        }
-
-        $returnedResponse = array(
-            'draw' => $request->draw,
-            'recordsTotal' => Contact::where('contacts.campaign_id', '=', $campaign->id)->count(),
-            'recordsFiltered' => $filteredData->count(),
-            'data' => $contactList
-        );
-
-        return response()->json($returnedResponse);
+    /**
+     * Update the specified resource in storage.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function update(Request $request, $id)
+    {
+        //
     }
 
-    public function getContactListCommon(Request $request) {
-        $ORDERED_COLUMNS = ['account_id', 'name', 'phone', 'bill_date', 'due_date', 'total_calls', 'nominal', 'call_dial', 'call_response'];
-        $ORDERED_BY = ['desc', 'asc'];
-
-        $COLUMN_IDX = is_numeric($request->order[0]['column']) ? $request->order[0]['column'] : 0;
-        $START = is_numeric($request->start) ? (int) $request->start : 0;
-        $LENGTH = is_numeric($request->length) ? (int) $request->length : 10;
-        $SEARCH_VALUE = !empty($request->search['value']) ? $request->search['value'] : '';
-
-        $campaign = Campaign::where('unique_key', '=', Str::replaceFirst('_', '', $request->campaign))->first();
-
-        $recordsTotalQuery = 0;
-        $contactList = [];
-
-        if ($campaign) {
-            $query = Contact::select(DB::raw('
-                    id,
-                    account_id,
-                    contacts.name AS name,
-                    phone,
-                    DATE_FORMAT(bill_date, "%d/%m/%Y") AS bill_date,
-                    DATE_FORMAT(due_date, "%d/%m/%Y") AS due_date,
-                    IF (total_calls IS NULL, 0, total_calls) AS total_calls,
-                    FORMAT(nominal, 0) AS nominal
-                '))
-                ->where('campaign_id', '=', $campaign->id);
-
-            if (!empty($SEARCH_VALUE)) {
-                $query->where(function($q) use($SEARCH_VALUE) {
-                    $q->where('contacts.account_id', 'LIKE', '%' . $SEARCH_VALUE . '%')
-                        ->orWhere('contacts.name', 'LIKE', '%' . $SEARCH_VALUE . '%')
-                        ->orwhere('contacts.phone', 'LIKE', '%' . $SEARCH_VALUE . '%')
-                        ->orwhere('bill_date', 'LIKE', '%' . $SEARCH_VALUE . '%')
-                        ->orwhere('due_date', 'LIKE', '%' . $SEARCH_VALUE . '%')
-                        ->orwhere('nominal', 'LIKE', '%' . $SEARCH_VALUE . '%')
-                        ->orwhere('call_dial', 'LIKE', '%' . $SEARCH_VALUE . '%');
-                });
-            }
-
-            if (in_array($request->order[0]['dir'], $ORDERED_BY)) {
-                $query->orderBy($ORDERED_COLUMNS[$COLUMN_IDX], $request->order[0]['dir']);
-            }
-            $filteredData = $query->get();
-            // $contactList = $query->offset($START)->limit($LENGTH)->get();
-            $contactList = $query->paginate(15);
-
-            foreach ($contactList AS $keyContact => $valueContact) {
-                $contactList[$keyContact]->call_dial = '-';
-                $contactList[$keyContact]->call_response = '-';
-                $tempCallLog = CallLog::select('call_dial', 'call_response')
-                    ->where('contact_id', '=', $valueContact->id)
-                    ->orderBy('id', 'DESC')
-                    ->first();
-                if ($tempCallLog) {
-                    $contactList[$keyContact]->call_dial = $tempCallLog->call_dial;
-                    $contactList[$keyContact]->call_response = ucwords($tempCallLog->call_response);
-                }
-            }
-        }
-
-        $returnedResponse = array(
-            'draw' => $request->draw,
-            'recordsTotal' => Contact::where('contacts.campaign_id', '=', $campaign->id)->count(),
-            'recordsFiltered' => $filteredData->count(),
-            'data' => $contactList
-        );
-
-        return $returnedResponse;
-    }
-    
-    public function getCallStatus(Request $request, $sentStartDate=null, $sentEndDate=null) {
-        $startDate = Carbon::now('Asia/Jakarta');
-        $endDate = Carbon::now('Asia/Jakarta');
-        $returnedCode = 500;
-
-        if ($sentStartDate != null) {
-            $startDate = Carbon::parse($sentStartDate, 'Asia/Jakarta');
-            if (!$startDate) {
-                $startDate = Carbon::now('Asia/Jakarta');
-            }
-        }
-
-        if ($sentEndDate != null) {
-            $endDate = Carbon::parse($sentEndDate, 'Asia/Jakarta');
-            if (!$endDate) {
-                $endDate = Carbon::now('Asia/Jakarta');
-            }
-        }
-
-        $startDate = $startDate->format('Y-m-d') . ' 00:00:00';
-        $endDate = $endDate->format('Y-m-d') . ' 23:59:59';
-        echo 'startDate: ' . $startDate . ' endDate: ' . $endDate . ' ';
-
-        $query = Contact::select(DB::raw('
-                (SELECT COUNT(call_response) FROM contacts WHERE created_at BETWEEN \'' . $startDate . '\' AND \'' . $endDate . '\' AND call_response=0) AS answered,
-                (SELECT COUNT(call_response) FROM contacts WHERE created_at BETWEEN \'' . $startDate . '\' AND \'' . $endDate . '\' AND call_response=1) AS no_answer,
-                (SELECT COUNT(call_response) FROM contacts WHERE created_at BETWEEN \'' . $startDate . '\' AND \'' . $endDate . '\' AND call_response=2) AS busy,
-                (SELECT COUNT(call_response) FROM contacts WHERE created_at BETWEEN \'' . $startDate . '\' AND \'' . $endDate . '\' AND call_response=3) AS failed
-            '))
-            ->get();
-        
-        $returnedResponse = array(
-            'code' => $returnedCode,
-            'data' => $query,
-        );
-
-        return response()->json($returnedResponse);
+    /**
+     * Remove the specified resource from storage.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function destroy($id)
+    {
+        //
     }
 }

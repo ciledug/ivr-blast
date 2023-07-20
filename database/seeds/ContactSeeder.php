@@ -6,6 +6,7 @@ use Carbon\Carbon;
 use Faker\Factory as Faker;
 
 use App\Campaign;
+use App\Contact;
 
 class ContactSeeder extends Seeder
 {
@@ -84,8 +85,28 @@ class ContactSeeder extends Seeder
     public function run()
     {
         DB::table('contacts')->truncate();
+
+        $campaigns = [
+            [
+                'campaign_id' => 1,
+                'template_id' => 1,
+                'reference_table' => 't_defaul_0000001',
+                'columns' => [ 'account_id', 'name', 'phone', 'bill_date', 'due_date', 'nominal', ],
+            ],
+            [
+                'campaign_id' => 2,
+                'template_id' => 2,
+                'reference_table' => 't_demo_0000002',
+                'columns' => [ 'product_name', 'phone', 'due_date', 'nominal', ],
+            ],
+            [
+                'campaign_id' => 3,
+                'template_id' => 5,
+                'reference_table' => 't_demo_0000005',
+                'columns' => [ 'product_name', 'phone', ],
+            ],
+        ];
         
-        $campaigns = Campaign::whereNotIn('id', [1])->get();
         $faker = Faker::create('id_ID');
         $lastWeek = Carbon::now('Asia/Jakarta')->subDays(7);
         $contactsCount = 100;
@@ -103,42 +124,77 @@ class ContactSeeder extends Seeder
         $operatorIdx = 0;
         $tempNominal = 0;
 
-        foreach ($campaigns AS $keyRefTable => $valRefTable) {
+        foreach ($campaigns AS $keyCampaign => $valCampaign) {
             for ($i = 1; $i <= $contactsCount; $i++) {
                 $operatorIdx = rand(0, count($operators) - 1);
+                $tempPhone = $operators[$operatorIdx] . $faker->numberBetween(100000, 99999999);
                 $tempNominal = $faker->numberBetween(100000, 1500000);
 
                 if (($i % 10) == 0) {
                     $lastWeek = Carbon::now('Asia/Jakarta')->subDays(7 + ($i / 10));
                 }
 
-                DB::table(strtolower($valRefTable['reference_table']))->insert([
-                    'product_name' => $valRefTable['name'],
-                    'phone' => $operators[$operatorIdx] . $faker->numberBetween(100000, 99999999),
-                    'due_date' => $lastWeek->format('Y-m-d'),
+                $contact = Contact::create([
+                    'campaign_id' => $valCampaign['campaign_id'],
+                    'phone' => $tempPhone,
                     'nominal' => $tempNominal,
-                    'extension' => null,
-                    'callerid' => null,
-                    'voice' => Helpers::generateVoice(
-                        $valRefTable['text_voice'],
-                        array(
-                            (object) array('name' => 'product_name', 'column_type' => 'string'),
-                            (object) array('name' => 'nominal', 'column_type' => 'numeric'),
-                            (object) array('name' => 'due_date', 'column_type' => 'date'),
-                        ),
-                        (object) array(
-                            'product_name' => $valRefTable['name'],
-                            'nominal' => $tempNominal,
-                            'due_date' => $lastWeek->format('Y-m-d'),)
-                    ),
                     'created_at' => Carbon::now('Asia/Jakarta')->format('Y-m-d H:i:s'),
                     'updated_at' => Carbon::now('Asia/Jakarta')->format('Y-m-d H:i:s'),
                 ]);
+
+                // ---
+                // --- dummy data for campaign id #1
+                // ---
+                if ($valCampaign['campaign_id'] == 1) {
+                    DB::table($valCampaign['reference_table'])->insert([
+                        'campaign_id' => $contact->campaign_id,
+                        'contact_id' => $contact->id,
+                        'account_id' => 'ID-' . str_pad($i, 6, '0', STR_PAD_LEFT),
+                        'name' => $faker->name,
+                        'phone' => $tempPhone,
+                        'bill_date' => $lastWeek->format('Y-m-d'),
+                        'due_date' => $lastWeek->format('Y-m-d'),
+                        'nominal' => $tempNominal,
+                        'created_at' => Carbon::now('Asia/Jakarta')->format('Y-m-d H:i:s'),
+                        'updated_at' => Carbon::now('Asia/Jakarta')->format('Y-m-d H:i:s'),
+                    ]);
+                }
+
+                // ---
+                // --- dummy data for campaign id #2
+                // ---
+                if ($valCampaign['campaign_id'] == 2) {
+                    DB::table($valCampaign['reference_table'])->insert([
+                        'campaign_id' => $contact->campaign_id,
+                        'contact_id' => $contact->id,
+                        'product_name' => $faker->creditCardType(),
+                        'phone' => $tempPhone,
+                        'due_date' => $lastWeek->format('Y-m-d'),
+                        'nominal' => $tempNominal,
+                        'created_at' => Carbon::now('Asia/Jakarta')->format('Y-m-d H:i:s'),
+                        'updated_at' => Carbon::now('Asia/Jakarta')->format('Y-m-d H:i:s'),
+                    ]);
+                }
+
+                // ---
+                // --- dummy data for campaign id #5
+                // ---
+                if ($valCampaign['campaign_id'] == 3) {
+                    DB::table($valCampaign['reference_table'])->insert([
+                        'campaign_id' => $contact->campaign_id,
+                        'contact_id' => $contact->id,
+                        'product_name' => $faker->currencyCode() . '/' . $faker->currencyCode(),
+                        'phone' => $tempPhone,
+                        'created_at' => Carbon::now('Asia/Jakarta')->format('Y-m-d H:i:s'),
+                        'updated_at' => Carbon::now('Asia/Jakarta')->format('Y-m-d H:i:s'),
+                    ]);
+                }
             }
 
-            DB::table('campaigns')
-                ->where('id', '=', $valRefTable['id'])
-                ->update([ 'total_data' => $contactsCount ]);
+            Campaign::where('id', $valCampaign['campaign_id'])
+                ->update([
+                    'total_data' => $contactsCount,
+                ]);
         }
     }
 }

@@ -30,7 +30,7 @@
             <table id="table-template-list-container" class="table table-hover">
               <thead>
                 <tr>
-                  <th scope="col">#</th>
+                  <th scope="col" class="text-center">#</th>
                   <th scope="col">Name</th>
                   <th scope="col">Action</th>
                 </tr>
@@ -40,12 +40,12 @@
                 @if(count($templates) > 0)
                   @foreach($templates AS $keyTemplate => $valueTemplate)
                     <tr>
-                      <td class="text-end">{{ $loop->index + 1 }}.</td>
+                      <td class="text-end">{{ $row_number++ }}.</td>
                       <td>{{ $valueTemplate->name }}</td>
                       <td>
                         @if ($loop->index > 0)
-                        {{-- <a href="{{ route('campaigns.edit', ['id' => $valueTemplate->id]) }}" class="btn btn-sm btn-warning btn-modal-spinner">Edit</a> --}}
-                        <a href="{{ route('campaigns.delete', ['id' => $valueTemplate->id]) }}" class="btn btn-sm btn-danger btn-modal-spinner">Delete</a>
+                        {{-- <a href="{{ route('templates.show', ['id' => $valueTemplate->id]) }}" class="btn btn-sm btn-info btn-modal-spinner">Detail</a> --}}
+                        <a href="{{ route('templates.destroy', ['id' => $valueTemplate->id]) }}" class="btn btn-sm btn-danger btn-modal-spinner">Delete</a>
                         @endif
                       </td>
                     </tr>

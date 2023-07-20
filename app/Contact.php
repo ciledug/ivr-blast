@@ -19,7 +19,10 @@ class Contact extends Model
         'nominal',
         'extension',
         'callerid',
+        'voice',
         'call_dial',
         'call_response',
+        'created_at',
+        'updated_at',
     ];
 }

@@ -67,7 +67,7 @@
                     <div class="row">
                       <div id="dialog-detail-campaign-progress" class="col-12 h5">
                         @php
-                          echo ($campaign_info->dialed_contacts > 0) ? number_format((($campaign_info->dialed_contacts / $campaign[0]->camp_total_data) * 100), 2, ',', '.') : '0';
+                          echo ($campaign_contacts_info[0]->completed_dials > 0) ? number_format($campaign_contacts_info[0]->completed_dials, 2, ',', '.') : '0';
                         @endphp
                       </div>
                     </div>
@@ -141,7 +141,7 @@
                     </div>
                     <div class="row">
                       <div id="dialog-detail-campaign-date-started" class="col-12 h5">
-                        {{ $campaign_info->started ? date('d/m/Y - H:i', strtotime($campaign_info->started)) : '-' }}
+                        {{ $campaign_contacts_info[0]->started ? date('d/m/Y - H:i', strtotime($campaign_contacts_info[0]->started)) : '-' }}
                       </div>
                     </div>
                   </div>
@@ -155,7 +155,7 @@
                     </div>
                     <div class="row">
                       <div id="dialog-detail-campaign-date-finished" class="col-12 h5">
-                        {{ $campaign_info->finished ? date('d/m/Y - H:i', strtotime($campaign_info->finished)) : '-' }}
+                        {{ $campaign_contacts_info[0]->finished ? date('d/m/Y - H:i', strtotime($campaign_contacts_info[0]->finished)) : '-' }}
                       </div>
                     </div>
                   </div>
@@ -172,7 +172,7 @@
                     </div>
                     <div class="row">
                       <div id="dialog-detail-campaign-total-calls" class="col-12 h5">
-                        {{ number_format($campaign_info->success + $campaign_info->no_answer + $campaign_info->busy + $campaign_info->failed, 0, ',', '.') }}
+                        {{ number_format($campaign_contacts_info[0]->sum_total_calls, 0, ',', '.') }}
                       </div>
                     </div>
                   </div>
@@ -185,7 +185,7 @@
                       <div class="col-12 label"><strong>Success Calls</strong></div>
                     </div>
                     <div class="row">
-                      <div id="dialog-detail-campaign-success-calls" class="col-12 h5">{{ number_format($campaign_info->success, 0, ',', '.') }}</div>
+                      <div id="dialog-detail-campaign-success-calls" class="col-12 h5">{{ number_format($campaign_contacts_info[0]->success, 0, ',', '.') }}</div>
                     </div>
                   </div>
                 </div>
@@ -197,7 +197,7 @@
                       <div class="col-12 label"><strong>No Answer Calls</strong></div>
                     </div>
                     <div class="row">
-                      <div id="dialog-detail-campaign-noanswer-calls" class="col-12 h5">{{ number_format($campaign_info->no_answer, 0, ',', '.') }}</div>
+                      <div id="dialog-detail-campaign-noanswer-calls" class="col-12 h5">{{ number_format($campaign_contacts_info[0]->no_answer, 0, ',', '.') }}</div>
                     </div>
                   </div>
                 </div>
@@ -209,7 +209,7 @@
                       <div class="col-12 label"><strong>Busy Calls</strong></div>
                     </div>
                     <div class="row">
-                      <div id="dialog-detail-campaign-busy-calls" class="col-12 h5">{{ number_format($campaign_info->busy, 0, ',', '.') }}</div>
+                      <div id="dialog-detail-campaign-busy-calls" class="col-12 h5">{{ number_format($campaign_contacts_info[0]->busy, 0, ',', '.') }}</div>
                     </div>
                   </div>
                 </div>
@@ -221,7 +221,7 @@
                       <div class="col-12 label"><strong>Failed Calls</strong></div>
                     </div>
                     <div class="row">
-                      <div id="dialog-detail-campaign-failed-calls" class="col-12 h5">{{ number_format($campaign_info->failed, 0, ',', '.') }}</div>
+                      <div id="dialog-detail-campaign-failed-calls" class="col-12 h5">{{ number_format($campaign_contacts_info[0]->failed, 0, ',', '.') }}</div>
                     </div>
                   </div>
                 </div>
@@ -249,8 +249,8 @@
                   </th>
                   @endforeach
 
-                  <th scope="col" class="align-top">CALL DATE</th>
-                  <th scope="col" class="align-top">CALL RESPONSE</th>
+                  <th scope="col" class="align-top">LAST CALL DATE</th>
+                  <th scope="col" class="align-top">LAST CALL RESPONSE</th>
                   <th scope="col" class="align-top">TOTAL CALLS</th>
                   <th scope="col" class="align-top">ACTION</th>
                   @else
@@ -260,7 +260,7 @@
               </thead>
 
               <tbody>
-                @foreach ($contacts->chunk(300) as $chunks)
+                @foreach ($campaign_contacts_info->chunk(300) as $chunks)
                   @foreach ($chunks as $valueData)
                     <tr>
                       <td class="text-end">{{ $row_number++ }}.</td>
@@ -283,11 +283,11 @@
                         @endif
                       @endforeach
 
-                      <td>{{ $valueData->call_dial ? date('d/m/Y H:i', strtotime($valueData->call_dial)) : '-' }}</td>
-                      <td>{{ $valueData->call_response ? strtoupper($valueData->call_response) : '-' }}</td>
-                      <td class="text-end">{{ number_format($valueData->total_calls, 0, ',', '.') }}</td>
+                      <td>{{ $valueData->cont_call_dial ? date('d/m/Y H:i', strtotime($valueData->cont_call_dial)) : '-' }}</td>
+                      <td>{{ $valueData->cont_call_response ? strtoupper($valueData->cont_call_response) : '-' }}</td>
+                      <td class="text-end">{{ number_format($valueData->cont_total_calls, 0, ',', '.') }}</td>
                       <td>
-                        <a href="{{ route('contacts.show', [ 'id' => $valueData->id, 'campaignId' => $valHeader->camp_id ]) }}" class="btn btn-sm btn-info">Detail</a>
+                        <a href="{{ route('contacts.show', [ 'id' => $valueData->cont_id ]) }}" class="btn btn-sm btn-info">Detail</a>
                       </td>
                     </tr>
                   @endforeach  
@@ -295,10 +295,10 @@
               </tbody>
             </table>
 
-            {{ !is_array($contacts) ? $contacts->links() : '' }}
+            {{ !is_array($campaign_contacts_info) ? $campaign_contacts_info->links() : '' }}
 
             <div class="col-md-12 mt-4">
-              <form id="form-campaign-export" class="g-3 needs-validation" method="POST" action="{{ url('campaigns/export') }}" enctype="multipart/form-data">
+              <form id="form-campaign-export" class="g-3 needs-validation" method="POST" action="{{ route('campaigns.export') }}" enctype="multipart/form-data">
                 <a href="{{ url('campaigns') }}" class="btn btn-secondary btn-back">Close</a>
 
                 @if ($campaign[0]->camp_total_data > 0)

@@ -6,7 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
-// use App\CallLog;
+use App\CallLog;
 use App\Campaign;
 // use App\Contact;
 
@@ -35,7 +35,7 @@ class DashboardController extends Controller
         );
 
         $campaigns = Campaign::selectRaw('
-                campaigns.id, campaigns.name, campaigns.reference_table, campaigns.total_data
+                campaigns.id, campaigns.name, campaigns.total_data
             ')
             ->where('campaigns.status', 1)
             ->whereNull('campaigns.deleted_at')
@@ -54,8 +54,7 @@ class DashboardController extends Controller
             );
 
             foreach($campaigns AS $keyCampaign => $valCampaign) {
-                $calls = DB::table($valCampaign->reference_table)
-                    ->selectRaw('
+                $calls = CallLog::selectRaw('
                         CAST(IFNULL(SUM(IF(call_response="answered", 1, 0)), 0) AS INT) AS call_answered,
                         CAST(IFNULL(SUM(IF(call_response="no_answer", 1, 0)), 0) AS INT) AS call_noanswer,
                         CAST(IFNULL(SUM(IF(call_response="busy", 1, 0)), 0) AS INT) AS call_busy,
@@ -63,14 +62,13 @@ class DashboardController extends Controller
                         CAST(SUM(IF(call_response IS NULL, 1, 0)) AS INT) AS data_remaining
                     ')
                     // ->whereRaw("DATE(call_dial) = ?", [$now])
-                    ->whereRaw("DATE(call_dial) = ?", [ Carbon::now('Asia/Jakarta')->subDays(7)->format('Y-m-d') ])
+                    ->where('campaign_id', $valCampaign->id)
+                    ->whereRaw("DATE(call_dial) = '2023-06-25'")
                     ->first();
                 $data['status'] = $calls;
 
-                unset($campaigns[$keyCampaign]['reference_table']);
                 $campaigns[$keyCampaign]['data_called'] = $calls->call_answered + $calls->call_noanswer + $calls->call_busy + $calls->call_failed;
                 $campaigns[$keyCampaign]['data_remaining'] = $valCampaign->total_data - $campaigns[$keyCampaign]['data_called'];
-                // $campaigns[$keyCampaign]['calls'] = $calls;
 
                 $data['calls']['call_answered'] += $calls->call_answered;
                 $data['calls']['call_noanswer'] += $calls->call_noanswer;

@@ -21,182 +21,93 @@
     -->
   </div>
 
-  {{-- @php dd($templates); @endphp --}}
-  @php
-    $tempCamp = Session::get('campaign_failed_contacts');
-    if ($tempCamp) $campaign = $tempCamp;
-  @endphp
-  {{-- @php dd($campaign); @endphp --}}
-
   <section class="section">
     <div class="row">
       <div class="col-lg-12">
 
-        @if (!isset($failed_contacts))
+        @if (!session('saved_contacts'))
         <div class="card">
-          <form id="form-update-campaign" class="g-3 needs-validation" method="POST" action="{{ url('campaigns') }}" enctype="multipart/form-data" novalidate>
-
+          <form id="form-create-campaign" class="g-3 needs-validation" method="POST" action="{{ route('campaigns.update', [ 'campaign' => $campaign_headers[0]->camp_id ]) }}" enctype="multipart/form-data" novalidate>
             <div class="card-body">
               <h5 class="card-title">
-                Edit Campaign
+                  Edit Campaign
               </h5>
-            
-              @if ($campaign[0]->camp_status != 0)
+
+              @if ($errors->has('campaign_referense_exists'))
               <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                <h4 class="alert-heading">Campaign Edit Error</h4>
-                <p>This campaign is being or has been processed so can not be edited or changed.</p>
+                <h4 class="alert-heading">Campaign Creation Error</h4>
+                <p>{{ $errors->first('campaign_referense_exists') }}</p>
+              </div>
+              @endif
+
+              @if ($errors->has('no_template_headers'))
+              <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <h4 class="alert-heading">Campaign Creation Error</h4>
+                <p>{{ $errors->first('no_template_headers') }}</p>
               </div>
               @endif
 
               <div id="alert-different-templates-container" class="alert alert-danger alert-dismissible fade show" role="alert">
                 <h4 class="alert-heading">Campaign Creation Error</h4>
-                <p>
-                  <span class="fw-bold">Upload Contacts Data File</span> structure does not match the selected <span class="fw-bold">Campaign Template</span> structure.
-                </p>
+                <p><span class="fw-bold">Upload Contacts Data File</span> structure does not match the selected <span class="fw-bold">Campaign Template</span> structure.</p>
               </div>
-              
+
               <!-- campaign name -->
-              <div class="col-md-12 mb-3">
-                <label class="form-label" for="edit-campaign-name">Campaign name (5-50 chars)</label>
+              <div class="col-md-12">
+                <label class="form-label" for="input-campaign-name">Campaign Name (5-50 chars)</label>
                 <input
                   type="text"
                   class="form-control"
-                  id="edit-campaign-name"
-                  name="campaign_name"
+                  id="input-campaign-name"
+                  name="name"
                   minlength="5" maxlength="50"
                   placeholder="Campaign name (5-50 chars)"
-                  value="{{ $campaign[0]->camp_name or '' }}"
-                  onkeyup="fillInputTemplateReference()"
+                  value="{{ $campaign_headers[0]->camp_name }}"
                   required
-                  @if ($campaign[0]->camp_status != 0) disabled @endif
                 >
               </div>
 
               <!-- campaign templates -->
-              <div class="col-md-12 mt-3 mb-3">
-                <label class="form-label" for="option-campaign-templates">Campaign Templates</label>
-                <select
-                  class="form-select"
-                  id="option-campaign-templates"
-                  name="select_campaign_template"
-                  aria-label="Campaign Templates"
-                  required
-                  @if ($campaign[0]->camp_status != 0) disabled @endif
-                >
-                  @php $headers = []; @endphp
-                  @foreach ($templates AS $keyTemplate => $valTemplate)
-                  <option value="{{ $valTemplate['id'] }}">{{ strtoupper($valTemplate['name']) }}</option>
-                  @endforeach
-                </select>
+              <div class="col-md-12 mt-3">
+                  <label class="form-label" for="option-campaign-templates">Campaign Templates</label>
+                  <select class="form-select" id="option-campaign-templates" name="selected_template" aria-label="Campaign Templates" required>
+                    @php $headers = []; @endphp
+                    @foreach ($templates AS $keyTemplate => $valTemplate)
+                    <option value="{{ $valTemplate['id'] }}">{{ strtoupper($valTemplate['name']) }}</option>
+                    @endforeach
+                  </select>
               </div>
-
-              {{--
-              <!-- campaign template reference -->
-              <div class="col-md-12 mt-3" style=>
-                <label class="form-label" for="input-template-reference">Campaign Template Reference</label>
-                <input
-                  type="text"
-                  class="form-control readonly"
-                  id="input-template-reference"
-                  name="template_reference"
-                  minlength="5" maxlength="100"
-                  placeholder="Campaign template reference"
-                  value="" readonly required
-                >
-                  
-                @if ($errors->has('template_reference'))
-                <div class="invalid-feedback mt-1 mb-1" style="display:block">
-                    <strong>{{ $errors->first('template_reference') }}</strong>
-                </div>
-                @endif
-              </div>
-              --}}
 
               <!-- campaign voice text -->
               <div class="col-md-12 mt-3 mb-3">
-                <label class="form-label" for="campaign-text-voice">Voice Text</label>
+                <label class="form-label" for="campaign-text-voice">Preview Voice Text</label>
                 <textarea
-                  id="campaign-text-voice"
-                  name="campaign_text_voice"
-                  class="form-control"
+                  id="campaign-text-voice" name="campaign_text_voice"
+                  class="form-control disabled"
                   rows="6"
-                  placeholder="Campaign text message">{{ trim($campaign[0]->camp_text_voice) }}</textarea>
+                  placeholder="Campaign text message"
+                  readonly disabled
+                ></textarea>
               </div>
 
-              <!-- campaign voice gender -->
-              <fieldset class="row mt-3 mb-3">
-                <legend class="col-form-label col-lg-3 col-md-2 col-sm-2 pt-0">Voice Gender</legend>
-                <div class="col-lg-4 col-md-3 col-sm-5">
-                  <div class="form-check">
-                    <input
-                      class="form-check-input"
-                      type="radio"
-                      name="campaign_voice_gender" id="radio-campaign-voice-male-normal"
-                      value="male_normal"
-                      required @if ($campaign[0]->camp_voice_gender === 'male_normal') checked @endif
-                    >
-                    <label class="form-check-label" for="radio-campaign-voice-male-normal">Male (normal)</label>
-                  </div>
-                  <div class="form-check">
-                    <input
-                      class="form-check-input"
-                      type="radio"
-                      name="campaign_voice_gender" id="radio-campaign-voice-male-strong"
-                      value="male_strong"
-                      required @if ($campaign[0]->camp_voice_gender === 'male_strong') checked @endif
-                    >
-                    <label class="form-check-label" for="radio-campaign-voice-male-strong">Male (strong)</label>
-                  </div>
-                </div>
-
-                <div class="col-lg-4 col-md-3 col-sm-5">
-                  <div class="form-check">
-                    <input
-                      class="form-check-input"
-                      type="radio"
-                      name="campaign_voice_gender" id="radio-campaign-voice-female-normal"
-                      value="female_normal"
-                      required @if ($campaign[0]->camp_voice_gender === 'female_normal') checked @endif
-                    >
-                    <label class="form-check-label" for="radio-campaign-voice-female-normal">Female (normal)</label>
-                  </div>
-                  <div class="form-check">
-                    <input
-                      class="form-check-input"
-                      type="radio"
-                      name="campaign_voice_gender" id="radio-campaign-voice-female-strong"
-                      value="female_strong"
-                      required @if ($campaign[0]->camp_voice_gender === 'female_strong') checked @endif
-                    >
-                    <label class="form-check-label" for="radio-campaign-voice-female-strong">Female (strong)</label>
-                  </div>
-                </div>
-
-                @if ($errors->has('campaign_voice_gender'))
-                <div class="invalid-feedback mt-1 mb-1" style="display:block">
-                    <strong>{{ $errors->first('campaign_voice_gender') }}</strong>
-                </div>
-                @endif
-              </fieldset>
-
-              <!-- campaign upload files -->
-              <div class="col-md-12 mt-3 mb-3">
-                <label class="form-label" for="edit-campaign-excel-file">Upload Contacts Data File</label>
+              <!-- campaign upload/download template -->
+              <div class="col-md-12 mt-3">
+                <label class="form-label" for="input-campaign-excel-file">Upload Contacts Data File</label>
 
                 <div class="col-md-12 input-group">
-                  <input class="form-control" type="file" id="edit-campaign-excel-file" accept=".xls, .xlsx" @if ($campaign[0]->camp_status != 0) disabled @endif>
-                  <a
-                    href="{{ url('campaigns/template') }}"
-                    class="btn btn-success @if ($campaign[0]->camp_status != 0) disabled @endif"
-                    type="button"
-                    @if ($campaign[0]->camp_status != 0) disabled @endif
-                  >
+                  <input class="form-control" type="file" id="input-campaign-excel-file" accept=".xls, .xlsx">
+                  <button id="btn-download-campaign-template" class="btn btn-success" type="button">
                     <i class="bi bi-download"></i>
                     &nbsp; Contacts Data Template
-                  </a>
+                  </button>
+                </div>
+
+                <div id="different-templates-message" class="invalid-feedback mt-1 mb-1" style="display:block">
+                  <span class="fw-bold">Upload Contacts Data File</span> structure does not match the selected <span class="fw-bold">Campaign Template</span>
+                  structure.
                 </div>
               </div>
-              
+
               <!-- upload contacts action -->
               <fieldset class="row mt-3 mb-4">
                 <legend class="col-form-label col-lg-3 col-md-2 col-sm-2 pt-0">Upload Contacts Action</legend>
@@ -207,85 +118,52 @@
                   </div>
                   <div class="form-check">
                     <input class="form-check-input radio-campaign-edit-action" type="radio" name="campaign_edit_action" id="radio-campaign-edit-action-replace" value="replace" disabled>
-                    <label class="form-check-label" for="radio-campaign-edit-action-replace">Replace Contacts (replace old contacts with new contacts)</label>
-                  </div>
-                  <div id="radio-campaign-edit-error" class="text-danger fw-smaller">
-                    Please choose the action for the new contacts data.
+                    <label class="form-check-label" for="radio-campaign-edit-action-replace">Replace Contacts (delete all old contacts and add new contacts)</label>
                   </div>
                 </div>
               </fieldset>
 
-              <hr>
-
-              <!-- previous contacts -->
-              <div id="row-table-previous-contacts" class="col-md-12 mt-4">
-                <table class="table table-hover">
-                  <thead>
-                    <tr>
-                        <th scope="col" class="align-top text-center">#</th>
-
-                        @foreach ($campaign AS $key => $value)
-                        <th scope="col" class="align-top">
-                          {{ strtoupper($value->templ_header_name) }}
-                          @php
-                            $tempAdd = [];
-                            if ($value->templ_is_mandatory) $tempAdd[] = 'mandatory';
-                            if ($value->templ_is_unique) $tempAdd[] = 'unique';
-                            if ($value->templ_is_voice) $tempAdd[] = 'voice-' . $value->templ_voice_position;
-                            if (!empty($tempAdd)) echo '<br><small class="fw-lighter">(' . implode(', ', $tempAdd) . ')</small>';
-                          @endphp
-                        </th>
-                        @endforeach
-                    </tr>
-                  </thead>
-    
-                  <tbody>
-                    @if ($contacts->count() > 0)
-                      @foreach ($contacts AS $keyData => $valueData)
-                      @php $headerName = ''; @endphp
-                      <tr>
-                        <td class="text-end">{{ $row_number++ }}.</td>
-
-                        @foreach($campaign AS $keyCampaign => $valCampaign)
-                          @php $headerName = strtolower(preg_replace('/\W+/i', '_', $valCampaign->templ_header_name)); @endphp
-
-                          @if ($valCampaign->templ_column_type === 'string') <td>{{ $valueData->$headerName }}</td>
-                          @elseif ($valCampaign->templ_column_type === 'datetime') <td>{{ date('d/m/Y H:i:s', strtotime($valueData->$headerName)) }}</td>
-                          @elseif ($valCampaign->templ_column_type === 'date') <td>{{ date('d/m/Y', strtotime($valueData->$headerName)) }}</td>
-                          @elseif ($valCampaign->templ_column_type === 'time') <td>{{ date('H:i:s', strtotime($valueData->$headerName)) }}</td>
-                          @elseif ($valCampaign->templ_column_type === 'handphone')
-                          <td>{{ substr($valueData->$headerName, 0, 4) . 'xxxxxx' . substr( $valueData->$headerName, strlen($valueData->$headerName) - 3) }}</td>
-                          @elseif ($valCampaign->templ_column_type === 'numeric') <td class="text-end">{{ number_format($valueData->$headerName, 0, ',', '.') }}</td>
-                          @endif
-
-                        @endforeach
-                      </tr>
-                      @endforeach
-                    @else
-                    <tr>
-                      <td class="text-center" colspan="{{ $campaign->count() + 1 }}">No contacts data</td>
-                    </tr>
-                    @endif
-                  </tbody>
-                </table>
-
-                {{ count($contacts) > 0 ? $contacts->links() : '' }}
+              <!-- progress bar --->
+              <div class="col-md-12 mt-3 mb-4">
+                <label id="progress-bar-title" class="form-label disabled">Data Check Progress</label>
+                <div class="progress" style="height:50px;">
+                  <div
+                      id="progress-bar-value"
+                      class="progress-bar progress-bar-striped active"
+                      role="progressbar"
+                      aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"
+                      style="width:0%"
+                  >0%</div>
+                </div>
               </div>
 
-              <!-- uploaded contacts -->
-              <div id="row-table-excel-contacts" class="col-md-12 mt-4">
+              <hr />
+
+              <!-- data check alert -->
+              <div id="alert-upload-problems" class="alert alert-danger alert-dismissible fade show" role="alert">
+                <h4 class="alert-heading">Data Check Results</h4>
+                <p>
+                  <span class="text-danger">
+                    <span class="fw-bold"><span id="upload-problems-rows-count"></span> row(s)</span> with
+                    <span class="fw-bold"><span id="upload-problems-data-count"></span> problem(s)</span> or invalid data.
+                  </span>
+                </p>
+              </div>
+
+              <!-- preview table -->
+              <div class="col-md-12 mt-4 mb-2" id="div-preview-contact-data-container">
                 <table id="table-preview-contact-data-container" class="table table-hover">
                   <thead>
-                    <tr>
+                    <tr id="row-preview-contact-data-container">
                       {{-- <th scope="col">#</th> --}}
-                      <th scope="col">Account ID</th>
-                      <th scope="col">Name</th>
-                      <th scope="col">Phone</th>
-                      <th scope="col">Bill Date</th>
-                      <th scope="col">Due Date</th>
-                      <th scope="col">Nominal</th>
+                      @foreach ($campaign_headers AS $key => $value)
+                      <th scope="col">{{ strtoupper($value->name) }}</th>
+                      @endforeach
                     </tr>
                   </thead>
+
+                  <tbody id="tbody-preview-contact-data-container">
+                  </tbody>
                 </table>
               </div>
 
@@ -313,30 +191,26 @@
               <!-- buttons container -->
               <div class="col-md-12 mt-4">
                 <button type="button" class="btn btn-secondary btn-back">Cancel</button>
-                @if ($campaign[0]->camp_status === 0)
-                {{ csrf_field() }}
-                <input type="hidden" id="edit-new-campaign-name" name="campaign_name" value="">
-                <input type="hidden" id="edit-campaign-rows" name="contact_rows" value="">
-                <input type="hidden" id="edit-campaign-key" name="campaign" value="{{ $campaign[0]->camp_id }}">
-                <input type="hidden" id="edit-campaign-action" name="action" value="">
-                <input type="hidden" id="edit-template-reference" name="template_reference" value="{{ $campaign[0]->camp_reference_table }}">
-                <input type="hidden" name="_method" value="PUT">
-                {{-- <button type="submit" class="btn btn-outline-primary disabled" id="btn-submit-edit-campaign">Save</button>&nbsp; --}}
-                <button type="submit" class="btn btn-primary">Save</button>&nbsp;
-                <div id="submit-spinner-edit-contacts" class="spinner-border spinner-border-sm text-primary" role="status">
+                <button type="submit" class="btn btn-primary" id="btn-submit-create-campaign">Save</button>&nbsp;
+                <div id="submit-spinner-save-contacts" class="spinner-border spinner-border-sm text-primary" role="status">
                   <span class="visually-hidden">Loading...</span>
                 </div>
-                <span id="submit-spinner-edit-contacts-text">&nbsp;This may take a moment. Please wait...</span>
-                @endif
+                <span id="submit-spinner-save-contacts-text">&nbsp;This may take a moment. Please wait...</span>
+                {{ csrf_field() }}
+                <input type="hidden" name="_method" value="PUT">
+                <input type="hidden" id="input-campaign-rows" name="input_campaign_rows" value="" required>
+                <input type="hidden" id="input-previous-campaign" name="previous_campaign" value="" required>
+                <input type="hidden" id="input-previous-template" name="previous_template" value="" required>
+                {{-- <input type="hidden" id="input-template-reference" name="template_reference" required> --}}
               </div>
-            </div>
 
+            </div>
           </form>
         </div>
         @endif
 
-        @if (isset($failed_contacts))
-        <div class="card">
+        @if (session('failed_contacts'))
+        <div id="input-failed-contacts-container" class="card">
           <div class="card-body">
             <h5 class="card-title">Failed Uploaded Contacts</h5>
 
@@ -345,87 +219,33 @@
               <p>Some contact data can not be saved. Please check the table below to see them.</p>
             </div>
 
-            <div id="row-table-failed-upload" class="col-md-12 mt-4">
-              @php
-                $headers = array();
-                $tempAdd = [];
-              @endphp
+            <div class="col-md-12 mt-4">
               <table id="table-failed-contacts-container" class="table table-hover">
                 <thead>
                   <tr>
-                    <th scope="col" class="align-top text-center">#</th>
-
-                    @foreach ($campaign AS $key => $value)
-                    <th scope="col" class="align-top">
-                      {{ strtoupper($value->templ_name) }}
-                      @php
-                        $headers[] = array(
-                          'col_name' => $value->templ_name,
-                          'col_type' => $value->templ_column_type,
-                        );
-                        $tempAdd = [];
-                        if ($value->templ_is_mandatory) $tempAdd[] = 'mandatory';
-                        if ($value->templ_is_unique) $tempAdd[] = 'unique';
-                        if ($value->templ_is_voice) $tempAdd[] = 'voice-' . $value->templ_voice_position;
-                        if (!empty($tempAdd)) echo '<br><small class="fw-lighter">(' . implode(', ', $tempAdd) . ')</small>';
-                      @endphp
-                    </th>
-                    @endforeach
-
-                    <th scope="col" class="align-top">Reason</th>
+                    {{-- <th scope="col">#</th> --}}
+                    <th scope="col">Account ID</th>
+                    <th scope="col">Name</th>
+                    <th scope="col">Phone</th>
+                    <th scope="col">Bill Date</th>
+                    <th scope="col">Due Date</th>
+                    <th scope="col">Nominal</th>
+                    <th scope="col">Failed Reason</th>
                   </tr>
                 </thead>
-
-                <tbody>
-                  @php
-                    $failed_contacts = json_decode($failed_contacts);
-                    $tempHeaderName = '';
-                    $tempHeaderType = '';
-                  @endphp
-                  @foreach ($failed_contacts AS $keyFailed => $valFailed)
-                  <tr>
-                    <td class="text-end">{{ $keyFailed + 1 }}.</td>
-
-                    @foreach($headers AS $keyHeader => $valHeader)
-                      @php
-                      $tempHeaderName = strtolower(preg_replace('/\W+/i', '_', $valHeader['col_name']));
-                      $tempHeaderType = $valHeader['col_type'];
-                      @endphp
-
-                      @if ($tempHeaderType === 'numeric')
-                    <td class="text-end"><span>{{ number_format($valFailed->$tempHeaderName, 0, ',', '.') }}</span></td>
-                      @else
-                    <td>{{ $valFailed->$tempHeaderName }}</td>
-                      @endif
-                    @endforeach
-
-                    <td><span class="text-danger">{{ $valFailed->failed }}</span></td>
-                  </tr>
-                  @endforeach
-                </tbody>
-                
               </table>
             </div>
 
-            
             <div class="col-md-12 mt-3">
-              <form
-                id="form-campaign-export"
-                class="g-3 needs-validation"
-                method="POST"
-                target="_blank"
-                action="{{ url('campaigns/export/failed') }}"
-                enctype="multipart/form-data"
-              >
+              <form id="form-campaign-export" class="g-3 needs-validation" method="POST" target="_blank" action="{{ url('campaigns/export/failed') }}" enctype="multipart/form-data">
                 <a href="{{ url('campaigns') }}" class="btn btn-secondary">Close</a>
                 <button type="submit" class="btn btn-success btn-export-as" id="btn-export-excel" data-export-as="excel">Export Excel</button>
                 {{ csrf_field() }}
-                <input type="hidden" name="failed_contacts_campaign" value="{{ $campaign[0]->camp_id }}">
-                <input type="hidden" id="campaign-failed-contacts" name="campaign_failed_contacts" value="{{ json_encode($failed_contacts) }}">
-                <input type="hidden" id="campaign-failed-contacts-headers" name="campaign_failed_contacts_headers" value="{{ json_encode($headers) }}">
+                <input type="hidden" name="input_key" value="{{ session('key') }}">
+                <input type="hidden" name="input_name" value="{{ session('name') }}">
+                <input type="hidden" name="input_failed_contacts" value="{{ session('failed_contacts') }}">
               </form>
             </div>
-           
           </div>
         </div>
         @endif
@@ -437,117 +257,188 @@
 
 @push('javascript')
 <script src="{{ url('js/xlsx.full.min.js') }}"></script>
+<script src="{{ url('js/luxon.min.js') }}"></script>
+<script src="https://unpkg.com/libphonenumber-js@1.9.6/bundle/libphonenumber-max.js"></script>
 <script type="text/javascript">
 var previewContactDataContainer = $('#table-preview-contact-data-container').DataTable();
 var failedContactDataContainer = '';
 var templates = JSON.parse('@php echo !empty($templates) ? json_encode($templates) : '[]' @endphp');
 var selectedTemplate = '';
-var headers = '';
+var selectedHeaders = '';
 var replacePattern = /\W+/ig;
 
-var previousCampaignTemplId = @php echo isset($campaign) ? $campaign[0]->camp_templ_id : 0; @endphp;
-var previousCampaignName = '@php echo isset($campaign) ? strtolower(trim($campaign[0]->camp_name)) : ''; @endphp';
-var previousCampaignRefTable = '@php echo isset($campaign) ? strtolower(trim($campaign[0]->camp_reference_table)) : ''; @endphp';
+var worker = '';
+var previousCampaigns = JSON.parse('@php echo isset($campaign_headers) ? json_encode($campaign_headers) : '{}'; @endphp');
+var previousContacts = JSON.parse('@php echo $contacts->count() > 0 ? json_encode($contacts) : '[]' @endphp');
+var previousUniqueValues = [];
 var editAction = '';
-var tempDatatableRows = [];
-
+var tempNewValidMergeContacts = [];
+var tempNewInvalidMergeContacts = [];
+var tempNewValidReplaceContacts = [];
+var tempNewInvalidReplaceContacts = [];
+var dataRows = null;
+var tempPreviewTableContacts = [];
 
   $(document).ready(function() {
     initWorker();
-    preparePreviewContactTable();
-    prepareRadioButtons();
-    showPreviewTable(false);
+    preparePreviewContactTable(0);
+    // prepareFailedContactsTable();
+    prepareSubmitCampaign();
+    showUploadProblemsReport(false, 0, 0);
+    checkPreviousUniqueValues();
 
-    @if (isset($failed_contacts))
-    prepareFailedContactsTable();
-    @endif
+    $('#input-campaign-excel-file').val('');
+    $('#input-campaign-rows').val('');
+    $('#submit-spinner-save-contacts').hide();
+    $('#submit-spinner-save-contacts-text').hide();
 
-    $('#radio-campaign-edit-error').hide();
-    $('#submit-spinner-edit-contacts').hide();
-    $('#submit-spinner-edit-contacts-text').hide();
     $('#alert-different-templates-container').hide();
+    $('#input-campaign-excel-file').removeClass('is-invalid');
+    $('#different-templates-message').hide();
 
-    $('#edit-campaign-rows').val('');
-    $('#edit-campaign-action').val('');
-    $('#edit-campaign-excel-file').val('');
+    $('#input-campaign-excel-file').on("change", function(e) {
+      // worker.postMessage({
+      //   action: 'open_data_file'
+      // });
 
-    $('#edit-campaign-excel-file').on("change", function(e) {
-      handleFileAsync(e);
+      setTimeout(() => {
+        handleFileAsync(e);
+      }, 1000);
     });
 
     $('#option-campaign-templates').on('change', function(e) {
+      $('#progress-bar-value').text('0%');
+      $('#progress-bar-value').css('width', '0%');
+
       selectedTemplate = templates['t_' + $(this).val()];
-      // console.log(selectedTemplate);
+      selectedHeaders = selectedTemplate.headers;
 
-      $('#radio-campaign-edit-action-merge').prop('checked', false).prop('disabled', true);
-      $('#radio-campaign-edit-action-replace').prop('checked', false).prop('disabled', true);
-      preparePreviewContactTable();
-
-      if ((selectedTemplate instanceof Object) && (selectedTemplate.id === previousCampaignTemplId)) {
-        showOriginalTable(true);
-        showPreviewTable(false);
-      }
-      else {
-        showOriginalTable(false);
-        showPreviewTable(true);
-      }
-      fillInputTemplateReference();
-
-      var inputFileContainer = $('#edit-campaign-excel-file');
+      var inputFileContainer = $('#input-campaign-excel-file');
       inputFileContainer[0].files = null;
       $(inputFileContainer).val('');
       
+      $('#campaign-text-voice').val(selectedTemplate.voice_text);
       $('#alert-different-templates-container').hide();
-      $('#edit-campaign-rows').val('');
+      $('#input-campaign-rows').val('').trigger('change');
+
+      setEnabledDataAction(false, false);
+      showUploadProblemsReport(false, 0, 0);
+      preparePreviewContactTable();
+
+      if (selectedTemplate.id === previousCampaigns[0].camp_templ_id) {
+        previewContactDataContainer.rows.add(previousContacts);
+        previewContactDataContainer.draw();
+      }
     });
 
-    $('#edit-campaign-name').keyup(function() {
-      var newName = $(this).val().trim();
-      if (previousCampaignName.localeCompare(newName) != 0) {
-        if (editAction === '') {
-          $('#btn-submit-edit-campaign').removeClass('btn-outline-primary disabled').addClass('btn-primary');
+    $('.radio-campaign-edit-action').on('click', function(e) {
+      editAction = $(this).val().toLowerCase();
+      previewContactDataContainer.rows().remove().draw();
+
+      if (editAction === 'merge') {
+        if (tempNewValidMergeContacts.length == 0 && tempNewInvalidMergeContacts.length == 0) {
+          var tempPreviousUniques = JSON.parse(JSON.stringify(previousUniqueValues));
+
+          tempPreviewTableContacts.map((valContact, keyContact) => {
+            var tempValContact = JSON.parse(JSON.stringify(valContact));
+
+            selectedHeaders.map((val, key) => {
+              if (val.is_unique) {
+                var tempHeaderName = val.header_name.toLowerCase().replaceAll(replacePattern, '_');
+
+                if (tempPreviousUniques.includes(tempValContact[tempHeaderName])) {
+                  tempValContact.errors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data duplicate</small>');
+                }
+                else {
+                  tempPreviousUniques.push(tempValContact[tempHeaderName]);
+                }
+              }
+            });
+
+            if (tempValContact.errors.length > 0) { 
+              tempValContact.errors = tempValContact.errors.join('<br>');
+              tempNewInvalidMergeContacts.push(tempValContact);
+            }
+            else tempNewValidMergeContacts.push(tempValContact);
+
+            // tempValContact = undefined;
+          });
         }
+
+        if (previousContacts.length > 0) previewContactDataContainer.rows.add(previousContacts).draw();
+        if (tempNewValidMergeContacts.length > 0) previewContactDataContainer.rows.add(tempNewValidMergeContacts).draw();
+        if (tempNewInvalidMergeContacts.length > 0) previewContactDataContainer.rows.add(tempNewInvalidMergeContacts).draw();
+        $('#input-campaign-rows').val(JSON.stringify(tempNewValidMergeContacts));
       }
-      else {
-        if ((editAction === '') && !$('#btn-submit-edit-campaign').hasClass('disabled')) {
-          $('#btn-submit-edit-campaign').removeClass('btn-primary').addClass('btn-outline-primary disabled');
+      else if (editAction === 'replace') {
+        if (tempNewValidReplaceContacts.length == 0 && tempNewInvalidReplaceContacts.length == 0) {
+          var tempPreviousUniques = [];
+
+          tempPreviewTableContacts.map((valContact, keyContact) => {
+            var tempValContact = JSON.parse(JSON.stringify(valContact));
+
+            selectedHeaders.map((val, key) => {
+              if (val.is_unique) {
+                var tempHeaderName = val.header_name.toLowerCase().replaceAll(replacePattern, '_');
+
+                if (tempPreviousUniques.includes(tempValContact[tempHeaderName])) {
+                  tempValContact.errors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data duplicate</small>');
+                }
+                else {
+                  tempPreviousUniques.push(tempValContact[tempHeaderName]);
+                }
+              }
+            });
+
+            if (tempValContact.errors.length > 0) {
+              tempValContact.errors = tempValContact.errors.join('<br>');
+              tempNewInvalidReplaceContacts.push(tempValContact);
+            }
+            else tempNewValidReplaceContacts.push(tempValContact);
+
+            // tempValContact = undefined;
+          });
         }
+
+        if (tempNewValidReplaceContacts.length > 0) previewContactDataContainer.rows.add(tempNewValidReplaceContacts).draw();
+        if (tempNewInvalidReplaceContacts.length > 0) previewContactDataContainer.rows.add(tempNewInvalidReplaceContacts).draw();
+        $('#input-campaign-rows').val(JSON.stringify(tempNewValidReplaceContacts));
       }
 
-      $('#option-campaign-templates').trigger('change');
+      $('#btn-submit-create-campaign').removeClass('disabled').removeAttr('disabled');
+      setInputFieldsVisibility(true);
     });
 
-    // ---
-    // --- update form submit
-    // ---
-    $('#form-update-campaign').submit(function() {
-      if ($('#edit-campaign-name').val().trim().length < 5) {
-        return false;
-      }
-
-      if (!$('#radio-campaign-edit-action-merge').is(':checked') && !$('#radio-campaign-edit-action-replace').is(':checked')) {
-        $('#radio-campaign-edit-error').show();
-        return false;
-      }
-
-      $('#edit-new-campaign-name').val($('#edit-campaign-name').val());
-
-      worker.postMessage({
-        action: 'hide_interactive_elements'
-      });
+    $('#btn-download-campaign-template').click(function(e) {
+      e.preventDefault();
+      window.location.href = '{{ url('templates/download') }}/' + $('#option-campaign-templates').val();
     });
-
+    
     $('.btn-back').click(function(e) {
-      window.history.back();
+      history.back();
     });
 
-    $('#option-campaign-templates').val(@php echo isset($campaign) ? $campaign[0]->camp_templ_id : 0; @endphp);
-    $('#option-campaign-templates').trigger('change');
+    $('#option-campaign-templates').val(previousCampaigns[0].camp_templ_id).trigger('change');
+
+    @if (isset($failed_contacts))
+    // populateFailedContacts();
+    @endif
   });
 
-  function preparePreviewContactTable() {
-    // console.log(selectedTemplate);
+  function checkPreviousUniqueValues() {
+    if (typeof previousContacts !== 'undefined') {
+      previousContacts.map((valContact, keyContact) => {
+        previousCampaigns.map((valCampaign, keyCampaign) => {
+          if (valCampaign.th_is_unique) {
+            var tempHeaderName = valCampaign.th_name.toLowerCase().replaceAll(replacePattern, '_');
+            previousUniqueValues.push(valContact[tempHeaderName]);
+          }
+        });
+      });
+    }
+  };
 
+  function preparePreviewContactTable() {
     previewContactDataContainer.destroy();
     $('#table-preview-contact-data-container').remove();
 
@@ -559,21 +450,16 @@ var tempDatatableRows = [];
     tempPreviewTable += '    <tr id="row-preview-contact-data-container"></tr>';
     tempPreviewTable += '  </thead>';
     tempPreviewTable += '</table>';
-    $('#row-table-excel-contacts').append(tempPreviewTable);
+    $('#div-preview-contact-data-container').append(tempPreviewTable);
     
     if (selectedTemplate instanceof Object) {
-      headers = selectedTemplate.headers || [];
-      // console.log(headers);
-
-      if (headers.length > 0) {
-        headers.map((v, k) => {
+      if (selectedHeaders.length > 0) {
+        selectedHeaders.map((v, k) => {
           var tempInfo = [];
           if (v.is_mandatory === 1) { tempInfo.push('mandatory'); }
           if (v.is_unique === 1) { tempInfo.push('unique'); }
           if (v.is_voice === 1) { tempInfo.push('voice-' + v.voice_position); }
-          if (tempInfo.length > 0) {
-            columns.title += '<br>(' + tempInfo.join(', ') + ')';
-          }
+          if (tempInfo.length > 0) { columns.title += '<br>(' + tempInfo.join(', ') + ')'; }
 
           columns.push({
             title: v.header_name.toUpperCase() + ((tempInfo.length > 0) ? '<br><small class="fw-lighter">(' + tempInfo.join(', ') + ')</small>' : ''),
@@ -586,8 +472,11 @@ var tempDatatableRows = [];
               className: 'dt-body-right'
             });
           }
+        });
 
-          // $('#row-preview-contact-data-container').append('<th scope="col">' + v.header_name + '</th>');
+        columns.push({
+          title: 'PROBLEMS',
+          data: 'errors'
         });
 
         previewContactDataContainer = $('#table-preview-contact-data-container').DataTable({
@@ -599,147 +488,818 @@ var tempDatatableRows = [];
         });
       }
     }
-
-    // console.log(columns);
-    // console.log(columnDefs);
   };
 
-
-
-  function prepareRadioButtons() {
-    $('#radio-campaign-edit-action-merge').prop('checked', false).prop('disabled', true);
-    $('#radio-campaign-edit-action-replace').prop('checked', false).prop('disabled', true);
-    $('.radio-campaign-edit-action').click(function(e) {
-      $('#edit-campaign-action').val($(this).val());
-      changeEditActionButtons();
+  function prepareFailedContactsTable() {
+    failedContactDataContainer = $('#table-failed-contacts-container').DataTable({
+      processing: true,
+      lengthMenu: [5, 10, 15, 20, 50, 100],
+      pageLength: 10,
+      columns: [
+        { data: 'account_id' },
+        { data: 'name' },
+        { data: 'phone' },
+        { data: 'bill_date' },
+        { data: 'due_date' },
+        { data: 'nominal' },
+        { 
+          data: 'failed',
+          render: function(data, type) {
+            return '<span class="text-danger">' + data + '</span>';
+          }
+        }
+      ],
+      columnDefs: [
+        {
+          targets: 5,
+          className: 'dt-body-right'
+        }
+      ]
     });
   };
 
-  function fillInputTemplateReference() {
-    if (selectedTemplate instanceof Object) {
-      var today = new Date();
-      var campaignName = $('#edit-campaign-name').val();
-      referenceName = 'c_' + campaignName.substr(0, 6) + '_t_' + selectedTemplate.name.substr(0, 6);
-      referenceName = referenceName.replaceAll(replacePattern, '_').toLowerCase().substr(0, 100) + '_' + String(today.getTime()).substr(6);
-      $('#edit-template-reference').val(referenceName);
-    }
+  function prepareSubmitCampaign() {
+    $('#form-create-campaign').submit(function() {
+      var postedNewContacts = JSON.parse($('#input-campaign-rows').val());
+
+      if (postedNewContacts.length > 0) {
+        if ((editAction.toLowerCase().trim() === 'merge') || (editAction.toLowerCase().trim() === 'replace')) {}
+        else { return false; }
+      }
+
+      $('#input-previous-campaign').val(previousCampaigns[0].camp_id);
+      $('#input-previous-template').val(previousCampaigns[0].camp_templ_id);
+
+      worker.postMessage({
+        action: 'hide_interactive_elements'
+      });
+    });
   };
 
   async function handleFileAsync(e) {
+    // showUploadProblemsReport(false, 0, 0);
     $('#alert-different-templates-container').hide();
-    $('#edit-campaign-rows').val('');
+    $('#input-campaign-rows').val('');
 
     worker.postMessage({
-      action: 'hide_interactive_elements'
+      action: 'clear_preview_table'
     });
 
-    const file = e.target.files[0];
-    const data = await file.arrayBuffer();
-    const workbook = XLSX.read(data, { dense:true });
-    const tempNewPhoneRows = [];
-    const campaignRows = [];
+    var file = e.target.files[0];
+    
+    if (file != undefined) {
+      var fileArrayBuffer = await file.arrayBuffer();
+      var workbook = XLSX.read(fileArrayBuffer, { dense:true });
 
-    const dataRows = XLSX.utils.sheet_to_json(
-      workbook.Sheets[workbook.SheetNames[0]],
-      { header:1 }
-    );
+      dataRows = XLSX.utils.sheet_to_json(
+        workbook.Sheets[workbook.SheetNames[0]],
+        { header:1 }
+      );
+      // console.log(dataRows);
 
+      workbook = undefined;
+      fileArrayBuffer = undefined;
+
+      readExcelData(dataRows);
+    }
+
+    file = undefined;
+  };
+
+  /*
+  async function readExcelData(dataRows) {
     var tempHeaders = [];
-    headers.map((val, key) => {
-      tempHeaders.push(val.header_name.toLowerCase().replaceAll(replacePattern, ''));
+    var isTemplateOk = true;
+    var tempRowData = [];
+    tempExcelContacts = [];
+
+    selectedHeaders.map((val, key) => {
+      tempHeaders.push({
+        name: val.header_name.toLowerCase().replaceAll(replacePattern, ''),
+        type: val.column_type,
+        is_mandatory: val.is_mandatory,
+        is_unique: val.is_unique
+      });
     });
     // console.log(tempHeaders);
 
-    var isTemplateOk = true;
-    dataRows[0].map((val, key) => {
-      var tempName = val.toLowerCase();
-      // console.log(tempName);
+    // --- template checking
+    if (dataRows[0].length == tempHeaders.length) {
+      dataRows[0].map((val, key) => {
+        var tempName = val.toLowerCase();
 
-      if (tempName.indexOf('(') > -1) {
-        tempName = val.substr(0, val.indexOf('(')).toLowerCase();
-      }
-      tempName = tempName.replaceAll(replacePattern, '');
-      // console.log(tempName);
-      
-      if (!tempHeaders.includes(tempName)) {
-        isTemplateOk = false;
-      }
-    });
+        if (tempName.indexOf('(') > -1) {
+          tempName = val.substr(0, val.indexOf('(')).toLowerCase();
+        }
+        tempName = tempName.replaceAll(replacePattern, '');
+        // console.log(tempName);
+        
+        if (tempName !== tempHeaders[key].name) {
+          isTemplateOk = false;
+        }
+
+        tempName = null;
+      });
+    }
+    else {
+      isTemplateOk = false;
+    }
 
     if (isTemplateOk) {
       dataRows.shift();
 
+      var percentage = 0;
+      var dataCount = dataRows.length;
+
       $.each(dataRows, function(k, v) {
         var tempNewRow = {};
-
-        headers.map((val, key) => {
-          tempNewRow[val.header_name.replaceAll(replacePattern, '_').toLowerCase()] = v[key] || '';
-          // console.log('key => ' + key + ', header => ' + val.header_name.replaceAll(replacePattern, '_').toLowerCase() + ', val => ' + v[key] + ', tempNewRow => ' + tempNewRow[val.header_name.replaceAll(replacePattern, '_').toLowerCase()]);
+        
+        tempHeaders.map((val, key) => {
+          tempNewRow.errors = null;
+          tempNewRow[val.name] = v[key] || '';
         });
+        
+        tempExcelContacts.push(tempNewRow);
+        percentage = ((tempExcelContacts.length / dataRows.length) * 100).toFixed(2);
 
-        tempNewPhoneRows.push(tempNewRow);
-        campaignRows.push(tempNewRow);
+        setTimeout((percentage) => {
+          updateProgressBar(percentage);
+        }, 800, percentage);
+
+        tempNewRow = undefined;
+        // console.log('readExcelData: ' + (k + 1));
       });
-      // console.log(campaignRows);
-      
-      $('#edit-campaign-rows').val(JSON.stringify(tempNewPhoneRows));
+
+      percentage = undefined;
+
+      setTimeout((dataCount) => {
+        if (dataCount > 0) {
+          if (selectedTemplate.id === previousCampaigns[0].camp_templ_id) {
+            setEnabledDataAction(true, true);
+            $('#radio-campaign-edit-action-merge').trigger('click');
+          }
+          else {
+            setEnabledDataAction(false, true);
+            $('#radio-campaign-edit-action-replace').trigger('click');
+          }
+        }
+      }, 1500, dataCount);
     }
     else {
       $('#alert-different-templates-container').show();
+      $('#input-campaign-excel-file').addClass('is-invalid');
+      $('#different-templates-message').show();
     }
 
-    previewContactDataContainer.clear();
-    previewContactDataContainer.rows.add(tempNewPhoneRows);
-    previewContactDataContainer.draw();
+    tempRowData = undefined;
+    isTemplateOk = undefined;
+    tempHeaders = undefined;
+    dataRows = undefined;
+  };
 
-    showOriginalTable(false);
-    showPreviewTable(true);
-    
-    worker.postMessage({
-      action: 'show_interactive_elements'
+  function checkNewContactData(editAction) {
+    $('#progress-bar-title').text('Data Check Progress');
+
+    var tempHeaderName = '';
+    var failedNewContacts = [];
+    var dataErrorsCount = 0;
+    var tempUniques = [];
+    var percentage = 0;
+    var newTempContacts = tempExcelContacts;
+    tempNewValidContacts = [];
+
+    if (editAction.toLowerCase() === 'merge') {
+      newTempContacts = $.merge( $.merge( [], previousContacts ), tempExcelContacts );
+    }
+    // console.log(editAction);
+    // console.log(tempExcelContacts);
+    // console.log(previousContacts);
+    // console.log(newTempContacts);
+
+    currentCheckValue = 0;
+    totalCheckValue = newTempContacts.length;
+
+    $.each(newTempContacts, function(keyContact, valContact) {
+      // console.log('checkNewContactData: ' + (keyContact + 1));
+      var tempNewRow = {};
+      var tempErrors = [];
+      var isContentOk = true;
+
+      selectedHeaders.map((valHeader, keyHeader) => {
+        tempHeaderName = valHeader.header_name.toLowerCase().replaceAll(replacePattern, '_');
+        tempNewRow[tempHeaderName] = valContact[tempHeaderName];
+        // console.log('tempHeaderName: ' + tempHeaderName + ': ' + valContact[tempHeaderName]);
+
+        if (isNaN(tempNewRow[tempHeaderName])) {
+          tempNewRow[tempHeaderName] = tempNewRow[tempHeaderName].trim();
+        }
+
+        switch (valHeader.column_type) {
+          case 'numeric':
+            if ((tempNewRow[tempHeaderName].length > 0) && isNaN(tempNewRow[tempHeaderName])) {
+              tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
+              isContentOk = false;
+              dataErrorsCount++;
+            }
+            break;
+          case 'datetime':
+            if (tempNewRow[tempHeaderName].length > 0) {
+              var dateTime = luxon.DateTime.fromFormat(tempNewRow[tempHeaderName], 'yyyy-MM-dd HH:mm:ss');
+              if (!dateTime.isValid) {
+                tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
+                isContentOk = false;
+                dataErrorsCount++;
+              }
+              // console.log(tempHeaderName + ' ' + valHeader.type + ' ' + tempNewRow[tempHeaderName] + ' isValid: ' + dateTime.isValid);
+              dateTime = undefined;
+            }
+            break;
+          case 'date':
+            if (tempNewRow[tempHeaderName].length > 0) {
+              var dateTime = luxon.DateTime.fromFormat(tempNewRow[tempHeaderName], 'yyyy-MM-dd');
+              if (!dateTime.isValid) {
+                tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
+                isContentOk = false;
+                dataErrorsCount++;
+              }
+              // console.log(tempHeaderName + ' ' + valHeader.type + ' ' + tempNewRow[tempHeaderName] + ' isValid: ' + dateTime.isValid);
+              dateTime = undefined;
+            }
+            break;
+          case 'time':
+            if (tempNewRow[tempHeaderName].length > 0) {
+              var dateTime = luxon.DateTime.fromFormat(tempNewRow[tempHeaderName], 'HH:mm:ss');
+              if (!dateTime.isValid) {
+                tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
+                isContentOk = false;
+                dataErrorsCount++;
+              }
+              // console.log(tempHeaderName + ' ' + valHeader.type + ' ' + tempNewRow[tempHeaderName] + ' isValid: ' + dateTime.isValid);
+              dateTime = undefined;
+            }
+            break;
+          case 'handphone':
+            // console.log(tempHeaderName + ' ' + valHeader.type + ' ' + tempNewRow[tempHeaderName]);
+            if (tempNewRow[tempHeaderName].length > 0) {
+              if (isNaN(tempNewRow[tempHeaderName])) {
+                tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
+                isContentOk = false;
+                dataErrorsCount++;
+              }
+              else {
+                var phone = libphonenumber.parsePhoneNumber(tempNewRow[tempHeaderName], 'ID');
+                if (!phone.isValid()) {
+                  tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
+                  isContentOk = false;
+                  dataErrorsCount++;
+                }
+                phone = undefined;
+              }
+            }
+            break;
+          default: break;
+        }
+        
+        if (valHeader.is_mandatory) {
+          if (tempNewRow[tempHeaderName].length == 0) {
+            tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
+            isContentOk = false;
+            dataErrorsCount++;
+          }
+        }
+        
+        if (valHeader.is_unique) {
+          if ((tempNewRow[tempHeaderName].length > 0) && tempUniques.includes(tempNewRow[tempHeaderName])) {
+            tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data duplicate</small>');
+            isContentOk = false;
+            dataErrorsCount++;
+          }
+          else {
+            tempUniques.push(tempNewRow[tempHeaderName]);
+          }
+        }
+      });
+
+      // if (isContentOk) {
+      //   if (valContact.cont_created_at === undefined) {
+      //     tempNewValidContacts.push(tempNewRow);
+      //   }
+      // }
+      // else {
+      //   tempNewRow.errors = tempErrors.join('<br>');
+      //   newTempContacts[keyContact] = tempNewRow;
+      //   failedNewContacts.push(tempNewRow);
+      // }
+
+      percentage = (((keyContact + 1) / newTempContacts.length) * 100).toFixed(2);
+      setTimeout((percentage) => {
+        updateProgressBar(percentage);
+      }, 800, percentage);
+
+      isContentOk = undefined;
+      tempErrors = undefined;
+      tempNewRow = undefined;
     });
-  };
 
-  function changeEditActionButtons() {
-    editAction = $('#edit-campaign-action').val();
-
-    if (editAction === 'merge') {
-      $('#btn-submit-edit-campaign').removeClass('btn-outline-primary disabled').addClass('btn-primary');
-    }
-    else if (editAction === 'replace') {
-      $('#btn-submit-edit-campaign').removeClass('btn-outline-primary disabled').addClass('btn-primary');
-    }
-  };
-
-  function isInputFieldsDisplayed(isDisplayed) {
-    if (isDisplayed) {
-      $('#edit-campaign-name').removeAttr('disabled');
-      $('#edit-campaign-excel-file').removeAttr('disabled');
-      $('#submit-spinner-edit-contacts').hide();
-      $('#submit-spinner-edit-contacts-text').hide();
-      $('.btn-back').removeClass('disabled');
-
-      if ($('#edit-campaign-rows').val() !== '') {
-        $('#btn-edit-contact-action-merge').removeClass('disabled');
-        $('#btn-edit-contact-action-replace').removeClass('disabled');
-        $('.radio-campaign-edit-action').removeAttr('disabled');
+    setTimeout((previewContactDataContainer, failedNewContacts, dataErrorsCount, newTempContacts, tempNewValidContacts) => {
+      if (failedNewContacts.length > 0) {
+        showUploadProblemsReport(true, failedNewContacts.length, dataErrorsCount);
       }
 
-      // if (editAction !== '') {
-      //   $('#btn-submit-edit-campaign').removeClass('disabled');
-      // }
+      previewContactDataContainer.rows().remove().draw();
+      previewContactDataContainer.rows.add(newTempContacts).draw();
+      $('#input-campaign-rows').val(JSON.stringify(tempNewValidContacts));
+    }, 1500, previewContactDataContainer, failedNewContacts, dataErrorsCount, newTempContacts, tempNewValidContacts);
+
+    newTempContacts = undefined;
+    percentage = undefined;
+    tempUniques = undefined;
+    dataErrorsCount = undefined;
+    failedNewContacts = undefined;
+    tempHeaderName = undefined;
+  };
+  */
+
+  /*
+  async function readExcelData(dataRows) {
+    var tempHeaders = [];
+    var isTemplateOk = true;
+    var tempRowData = [];
+    var tempUniques = [];
+    
+    tempNewValidContacts = [];
+    tempNewInvalidContacts = [];
+
+    selectedHeaders.map((val, key) => {
+      tempHeaders.push({
+        name: val.header_name.toLowerCase().replaceAll(replacePattern, ''),
+        type: val.column_type,
+        is_mandatory: val.is_mandatory,
+        is_unique: val.is_unique
+      });
+    });
+    // console.log(tempHeaders);
+
+    // --- template checking
+    if (dataRows[0].length == tempHeaders.length) {
+      dataRows[0].map((val, key) => {
+        var tempName = val.toLowerCase();
+
+        if (tempName.indexOf('(') > -1) {
+          tempName = val.substr(0, val.indexOf('(')).toLowerCase();
+        }
+        tempName = tempName.replaceAll(replacePattern, '');
+        // console.log(tempName);
+        
+        if (tempName !== tempHeaders[key].name) {
+          isTemplateOk = false;
+        }
+
+        tempName = null;
+      });
     }
     else {
-      $('#edit-campaign-name').attr('disabled', 'disabled');
-      $('#edit-campaign-excel-file').attr('disabled', 'disabled');
-      $('#btn-submit-edit-campaign').addClass('disabled');
-      $('#submit-spinner-edit-contacts').show();
-      $('#submit-spinner-edit-contacts-text').show();
-      $('.btn-back').addClass('disabled');
+      isTemplateOk = false;
+    }
 
-      $('#btn-edit-contact-action-merge').addClass('disabled');
-      $('#btn-edit-contact-action-replace').addClass('disabled');
-      $('.radio-campaign-edit-action').attr('disabled', 'disabled');
+    if (isTemplateOk) {
+      var tempDataRows = [];
+      var newTempContacts = [];
+      var percentage = 0;
+      var dataCount = 0;
+      var dataErrorsCount = 0;
+      var tempPreviewTableContacts = [];
+
+      dataRows.map((v, k) => {
+        tempDataRows.push(v);
+      });
+      tempDataRows.shift();
+
+      if (editAction === 'merge') {
+        var tempPreviousContacs = [];
+        // console.log(previousContacts);
+
+        previousContacts.map((valPrevContact, keyPrevContact) => {
+          var tempContact = [];
+          tempHeaders.map((valHeader, keyHeader) => {
+            tempContact.push(valPrevContact[valHeader.name]);
+          });
+          tempContact['cont_created_at'] = valPrevContact.cont_created_at;
+          tempPreviousContacs.push(tempContact);
+          tempContact = undefined;
+        });
+        // console.log(tempPreviousContacs);
+        newTempContacts = $.merge( $.merge( [], tempPreviousContacs ), tempDataRows );
+      }
+      else {
+        newTempContacts = tempDataRows;
+      }
+      // console.log(newTempContacts);
+
+      dataCount = newTempContacts.length;
+
+      newTempContacts.map((valDataRow, keyDataRow) => {
+        var tempNewRow = {};
+        var tempHeaderName = '';
+        var tempErrors = [];
+        var isContentOk = true;
+
+        tempHeaders.map((valHeader, keyHeader) => {
+          tempHeaderName = valHeader.name;
+          tempNewRow[tempHeaderName] = valDataRow[keyHeader];
+          // console.log('tempHeaderName: ' + tempHeaderName + ', type: ' + valHeader.type + ', tempNewRow[tempHeaderName]: ' + tempNewRow[tempHeaderName]);
+
+          if (tempNewRow[tempHeaderName] === undefined) {
+            tempNewRow[tempHeaderName] = '';
+          }
+
+          switch (valHeader.type) {
+            case 'numeric':
+              if ((tempNewRow[tempHeaderName].length > 0) && isNaN(tempNewRow[tempHeaderName])) {
+                tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
+                isContentOk = false;
+                dataErrorsCount++;
+              }
+              break;
+            case 'datetime':
+              if (tempNewRow[tempHeaderName].length > 0) {
+                var dateTime = luxon.DateTime.fromFormat(tempNewRow[tempHeaderName], 'yyyy-MM-dd HH:mm:ss');
+                if (!dateTime.isValid) {
+                  tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
+                  isContentOk = false;
+                  dataErrorsCount++;
+                }
+                // console.log(tempHeaderName + ' ' + valHeader.type + ' ' + tempNewRow[tempHeaderName] + ' isValid: ' + dateTime.isValid);
+                dateTime = undefined;
+              }
+              break;
+            case 'date':
+              if (tempNewRow[tempHeaderName].length > 0) {
+                var dateTime = luxon.DateTime.fromFormat(tempNewRow[tempHeaderName], 'yyyy-MM-dd');
+                if (!dateTime.isValid) {
+                  tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
+                  isContentOk = false;
+                  dataErrorsCount++;
+                }
+                // console.log(tempHeaderName + ' ' + valHeader.type + ' ' + tempNewRow[tempHeaderName] + ' isValid: ' + dateTime.isValid);
+                dateTime = undefined;
+              }
+              break;
+            case 'time':
+              if (tempNewRow[tempHeaderName].length > 0) {
+                var dateTime = luxon.DateTime.fromFormat(tempNewRow[tempHeaderName], 'HH:mm:ss');
+                if (!dateTime.isValid) {
+                  tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
+                  isContentOk = false;
+                  dataErrorsCount++;
+                }
+                // console.log(tempHeaderName + ' ' + valHeader.type + ' ' + tempNewRow[tempHeaderName] + ' isValid: ' + dateTime.isValid);
+                dateTime = undefined;
+              }
+              break;
+            case 'handphone':
+              // console.log(tempHeaderName + ' ' + valHeader.type + ' ' + tempNewRow[tempHeaderName]);
+              if (tempNewRow[tempHeaderName].length > 0) {
+                if (isNaN(tempNewRow[tempHeaderName])) {
+                  tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
+                  isContentOk = false;
+                  dataErrorsCount++;
+                }
+                else {
+                  var phone = libphonenumber.parsePhoneNumber(tempNewRow[tempHeaderName], 'ID');
+                  if (!phone.isValid()) {
+                    tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
+                    isContentOk = false;
+                    dataErrorsCount++;
+                  }
+                  phone = undefined;
+                }
+              }
+              break;
+            default: break;
+          }
+          
+          if (valHeader.is_mandatory) {
+            if (tempNewRow[tempHeaderName].length == 0) {
+              tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
+              isContentOk = false;
+              dataErrorsCount++;
+            }
+          }
+          
+          if (valHeader.is_unique) {
+            if ((tempNewRow[tempHeaderName].length > 0) && tempUniques.includes(tempNewRow[tempHeaderName])) {
+              tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data duplicate</small>');
+              isContentOk = false;
+              dataErrorsCount++;
+            }
+            else {
+              tempUniques.push(tempNewRow[tempHeaderName]);
+            }
+          }
+        });
+
+        if (isContentOk) {
+          tempNewRow['errors'] = null;
+          if (valDataRow.cont_created_at === undefined) {
+            tempNewValidContacts.push(tempNewRow);
+          }
+        }
+        else {
+          tempNewRow['errors'] = tempErrors.join('<br>');
+          tempNewInvalidContacts.push(tempNewRow);
+        }
+        
+        tempPreviewTableContacts.push(tempNewRow);
+        percentage = ((tempPreviewTableContacts.length / dataCount) * 100).toFixed(2);
+
+        setTimeout((percentage) => {
+          updateProgressBar(percentage);
+        }, 800, percentage);
+
+        tempNewRow = undefined;
+      });
+
+      
+      setTimeout((tempPreviewTableContacts) => {
+        if (tempNewInvalidContacts.length > 0) {
+          showUploadProblemsReport(true, tempNewInvalidContacts.length, dataErrorsCount);
+        }
+
+        if (selectedTemplate.id === previousCampaigns[0].camp_templ_id) {
+          setEnabledDataAction(true, true);
+        } else {
+          setEnabledDataAction(false, true);
+          $('#radio-campaign-edit-action-replace').prop('checked', 'checked');
+          editAction = 'replace';
+        }
+
+        $('#input-campaign-rows').val(JSON.stringify(tempNewValidContacts));
+        $('#btn-submit-create-campaign').removeClass('disabled').removeAttr('disabled');
+        $('#input-campaign-excel-file').removeClass('is-invalid');
+        $('#different-templates-message').hide();
+        previewContactDataContainer.rows.add(tempPreviewTableContacts).draw();
+
+        worker.postMessage({
+          action: 'show_interactive_elements'
+        });
+        
+      }, 1500, tempPreviewTableContacts);
+
+      tempPreviewTableContacts = undefined;
+      percentage = undefined;
+      newTempContacts = undefined;
+      tempDataRows = undefined;
+    }
+    else {
+      $('#input-campaign-excel-file').addClass('is-invalid');
+      $('#different-templates-message').show();
+      $('#alert-different-templates-container').show();
+      $('#btn-submit-create-campaign').addClass('disabled').attr('disabled', 'disabled');
+
+      worker.postMessage({
+        action: 'show_interactive_elements'
+      });
+    }
+
+    tempUniques = undefined;
+    tempRowData = undefined;
+    isTemplateOk = undefined;
+    tempHeaders = undefined;
+  };
+  */
+
+  async function readExcelData(dataRows) {
+    var tempHeaders = [];
+    var isTemplateOk = true;
+    var tempRowData = [];
+    var tempUniques = [];
+    
+    
+    tempNewValidMergeContacts = [];
+    tempNewInvalidMergeContacts = [];
+    tempNewValidReplaceContacts = [];
+    tempNewInvalidReplaceContacts = [];
+
+    selectedHeaders.map((val, key) => {
+      tempHeaders.push({
+        name: val.header_name.toLowerCase().replaceAll(replacePattern, ''),
+        type: val.column_type,
+        is_mandatory: val.is_mandatory,
+        is_unique: val.is_unique
+      });
+    });
+    // console.log(tempHeaders);
+
+    // --- template checking
+    if (dataRows[0].length == tempHeaders.length) {
+      dataRows[0].map((val, key) => {
+        var tempName = val.toLowerCase();
+
+        if (tempName.indexOf('(') > -1) {
+          tempName = val.substr(0, val.indexOf('(')).toLowerCase();
+        }
+        tempName = tempName.replaceAll(replacePattern, '');
+        // console.log(tempName);
+        
+        if (tempName !== tempHeaders[key].name) {
+          isTemplateOk = false;
+        }
+
+        tempName = null;
+      });
+    }
+    else {
+      isTemplateOk = false;
+    }
+
+    if (isTemplateOk) {
+      var tempDataRows = [];
+      var newTempContacts = [];
+      var percentage = 0;
+      var dataCount = 0;
+      var dataErrorsCount = 0;
+      var tempPreviousUniques = [];
+      tempPreviewTableContacts = [];
+
+      previousUniqueValues.map((valUnique, keyUnique) => {
+        tempPreviousUniques.push(valUnique);
+      });
+      // console.log(tempPreviousUniques);
+      // console.log(tempPreviousUniques.length);
+
+      dataRows.shift();
+      dataCount = dataRows.length;
+
+      dataRows.map((valDataRow, keyDataRow) => {
+        var tempNewRow = {};
+        var tempHeaderName = '';
+        var tempErrors = [];
+        var tempReplaceActionErrors = [];
+        var isContentOk = true;
+
+        var tempValidMerge = [];
+        var tempValidReplace = [];
+
+        tempHeaders.map((valHeader, keyHeader) => {
+          tempHeaderName = valHeader.name;
+          tempNewRow[tempHeaderName] = valDataRow[keyHeader];
+          tempNewRow['errors'] = [];
+          // console.log('tempHeaderName: ' + tempHeaderName + ', type: ' + valHeader.type + ', tempNewRow[tempHeaderName]: ' + tempNewRow[tempHeaderName]);
+
+          if (tempNewRow[tempHeaderName] === undefined || tempNewRow[tempHeaderName] === null) {
+            tempNewRow[tempHeaderName] = '';
+          }
+
+          switch (valHeader.type) {
+            case 'numeric':
+              if ((tempNewRow[tempHeaderName].length > 0) && isNaN(tempNewRow[tempHeaderName])) {
+                tempNewRow.errors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
+                dataErrorsCount++;
+              }
+              break;
+            case 'datetime':
+              if (tempNewRow[tempHeaderName].length > 0) {
+                var dateTime = luxon.DateTime.fromFormat(tempNewRow[tempHeaderName], 'yyyy-MM-dd HH:mm:ss');
+                if (!dateTime.isValid) {
+                  tempNewRow.errors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
+                  dataErrorsCount++;
+                }
+                // console.log(tempHeaderName + ' ' + valHeader.type + ' ' + tempNewRow[tempHeaderName] + ' isValid: ' + dateTime.isValid);
+                dateTime = undefined;
+              }
+              break;
+            case 'date':
+              if (tempNewRow[tempHeaderName].length > 0) {
+                var dateTime = luxon.DateTime.fromFormat(tempNewRow[tempHeaderName], 'yyyy-MM-dd');
+                if (!dateTime.isValid) {
+                  tempNewRow.errors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
+                  dataErrorsCount++;
+                }
+                // console.log(tempHeaderName + ' ' + valHeader.type + ' ' + tempNewRow[tempHeaderName] + ' isValid: ' + dateTime.isValid);
+                dateTime = undefined;
+              }
+              break;
+            case 'time':
+              if (tempNewRow[tempHeaderName].length > 0) {
+                var dateTime = luxon.DateTime.fromFormat(tempNewRow[tempHeaderName], 'HH:mm:ss');
+                if (!dateTime.isValid) {
+                  tempNewRow.errors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
+                  dataErrorsCount++;
+                }
+                // console.log(tempHeaderName + ' ' + valHeader.type + ' ' + tempNewRow[tempHeaderName] + ' isValid: ' + dateTime.isValid);
+                dateTime = undefined;
+              }
+              break;
+            case 'handphone':
+              // console.log(tempHeaderName + ' ' + valHeader.type + ' ' + tempNewRow[tempHeaderName]);
+              if (tempNewRow[tempHeaderName].length > 0) {
+                if (isNaN(tempNewRow[tempHeaderName])) {
+                  tempNewRow.errors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
+                  dataErrorsCount++;
+                }
+                else {
+                  var phone = libphonenumber.parsePhoneNumber(tempNewRow[tempHeaderName], 'ID');
+                  if (!phone.isValid()) {
+                    tempNewRow.errors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
+                    dataErrorsCount++;
+                  }
+                  phone = undefined;
+                }
+              }
+              break;
+            default: break;
+          }
+          
+          if (valHeader.is_mandatory) {
+            if (tempNewRow[tempHeaderName].length == 0) {
+              tempNewRow.errors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data required</small>');
+              dataErrorsCount++;
+            }
+          }
+        });
+        
+        tempPreviewTableContacts.push(tempNewRow);
+        percentage = (((keyDataRow + 1) / dataCount) * 100).toFixed(2);
+
+        setTimeout((percentage) => {
+          updateProgressBar(percentage);
+        }, 800, percentage);
+
+        tempNewRow = undefined;
+      });
+      
+      setTimeout(() => {
+        if (selectedTemplate.id === previousCampaigns[0].camp_templ_id) {
+          $('#radio-campaign-edit-action-merge').trigger('click');
+          setEnabledDataAction(true, true);
+        } else {
+          $('#radio-campaign-edit-action-replace').trigger('click');
+          setEnabledDataAction(false, true);
+        }
+      }, 1500);
+
+      percentage = undefined;
+      newTempContacts = undefined;
+      tempDataRows = undefined;
+    }
+    else {
+      $('#input-campaign-excel-file').addClass('is-invalid');
+      $('#different-templates-message').show();
+      $('#alert-different-templates-container').show();
+      $('#btn-submit-create-campaign').addClass('disabled').attr('disabled', 'disabled');
+
+      worker.postMessage({
+        action: 'show_interactive_elements'
+      });
+    }
+
+    tempUniques = undefined;
+    tempRowData = undefined;
+    isTemplateOk = undefined;
+    tempHeaders = undefined;
+  };
+
+  function updateProgressBar(percentage) {
+    // console.log('percentage: ' + percentage);
+    $('#upload-progress').val(percentage + '%');
+    $('#progress-bar-value').text(percentage + '%');
+    $('#progress-bar-value').css({ 'width': percentage + '%' });
+  };
+
+  function setInputFieldsVisibility(isDisplayed) {
+    if (isDisplayed) {
+      $('#input-campaign-name').removeAttr('disabled');
+      $('#option-campaign-templates').removeAttr('disabled');
+      $('#input-campaign-excel-file').removeAttr('disabled');
+      $('#btn-download-campaign-template').removeClass('disabled').removeAttr('disabled');
+      $('#submit-spinner-save-contacts').hide();
+      $('#submit-spinner-save-contacts-text').hide();
+      $('.btn-back').removeClass('disabled');
+    }
+    else {
+      $('#input-campaign-name').attr('disabled', 'disabled');
+      $('#option-campaign-templates').attr('disabled', 'disabled');
+      $('#input-campaign-excel-file').attr('disabled', 'disabled');
+      $('#btn-download-campaign-template').addClass('disabled').prop('disabled', 'disabled');
+      $('#submit-spinner-save-contacts').show();
+      $('#submit-spinner-save-contacts-text').show();
+      $('.btn-back').addClass('disabled');
+      setEnabledDataAction(false, false);
+    }
+  };
+
+  function showProgressBarContainer(isDisplayed) {
+    // console.log(isDisplayed + ' ' + $('#modal-progress').is(':visible'));
+    if (!isDisplayed) {
+      if ($('#modal-progress').is(':visible')) {
+        $('#modal-progress').modal('hide');
+      }
+    }
+    else {
+      if (!$('#modal-progress').is(':visible')) {
+        $('#modal-progress').modal('show');
+      }
     }
   };
 
@@ -747,37 +1307,60 @@ var tempDatatableRows = [];
     worker = new Worker('{{ url('js/demo_worker.js') }}');
     worker.onmessage = function(e) {
       // console.log(e.data);
-      if (e.data.action === 'from_worker_hide_interactive_elements') {
-        isInputFieldsDisplayed(false);
+      if (e.data.action === 'from_worker_run_read_excel_data') {
+        readExcelData(e.data.dataRows);
       }
-      if (e.data.action === 'from_worker_show_interactive_elements') {
-        isInputFieldsDisplayed(true);
+      else if (e.data.action === 'from_worker_clear_preview_table') {
+        previewContactDataContainer.rows().remove().draw();
+        updateProgressBar(0);
+        showUploadProblemsReport(false, 0, 0);
+        setInputFieldsVisibility(false);
+        $('#btn-submit-create-campaign').addClass('disabled').attr('disabled', 'disabled');
       }
-      else if (e.data.action === 'from_worker_start_get_progress_import') {
+      else if (e.data.action === 'from_worker_show_interactive_elements') {
+        setInputFieldsVisibility(true);
       }
     }
   };
 
-  function showOriginalTable(isShown) {
-    if (isShown) $('#row-table-previous-contacts').show();
-    else $('#row-table-previous-contacts').hide();
+  function showUploadProblemsReport(isDisplayed, rowsCount, dataCount) {
+    $('#upload-problems-rows-count').text(rowsCount);
+    $('#upload-problems-data-count').text(dataCount);
+    isDisplayed ? $('#alert-upload-problems').show() : $('#alert-upload-problems').hide();
   };
 
-  function showPreviewTable(isShown) {
-    if (isShown) $('#row-table-excel-contacts').show();
-    else $('#row-table-excel-contacts').hide();
+  function setEnabledDataAction(isMergeEnabled, isReplaceEnabled) {
+    var radioDataAction = $('.radio-campaign-edit-action');
+
+    if (radioDataAction !== undefined) {
+      $(radioDataAction).removeAttr('required');
+      $(radioDataAction).prop('checked', false).prop('disabled', 'disabled');
+
+      if (isMergeEnabled && isReplaceEnabled) {
+        $('#radio-campaign-edit-action-merge').removeAttr('disabled').prop('required', 'required');
+        $('#radio-campaign-edit-action-replace').removeAttr('disabled').prop('required', 'required');
+      }
+      else if (isMergeEnabled) {
+        $('#radio-campaign-edit-action-merge').removeAttr('disabled').prop('required', 'required');
+      }
+      else if (isReplaceEnabled) {
+        $('#radio-campaign-edit-action-replace').removeAttr('disabled').prop('required', 'required');
+      }
+    }
   };
-  
+
   @if (isset($failed_contacts))
-  function prepareFailedContactsTable() {
-    failedContactDataContainer = $('#table-failed-contacts-container').DataTable({
-        processing: true,
-        lengthMenu: [5, 10, 15, 20, 50, 100],
-        pageLength: 15
-      });
-  };
-  @endif
+  // function populateFailedContacts() {
+  //   var failedContactsText = '@php echo($failed_contacts); @endphp';
+  //   var failedContactsObjects = JSON.parse(failedContactsText);
 
+  //   $('#input-failed-contacts').val(failedContactsText);
+
+  //   failedContactDataContainer.clear();
+  //   failedContactDataContainer.rows.add(failedContactsObjects);
+  //   failedContactDataContainer.draw();
+  // }
+  @endif
 </script>
 @endpush
 
