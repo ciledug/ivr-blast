@@ -124,8 +124,12 @@
               </fieldset>
 
               <!-- progress bar --->
-              <div class="col-md-12 mt-3 mb-4">
-                <label id="progress-bar-title" class="form-label disabled">Data Check Progress</label>
+              <div class="col-md-12 mt-3 mb-3">
+                <label id="progress-bar-title" class="form-label disabled">Progress</label>&nbsp;
+                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+                {{--
                 <div class="progress" style="height:50px;">
                   <div
                       id="progress-bar-value"
@@ -135,6 +139,7 @@
                       style="width:0%"
                   >0%</div>
                 </div>
+                --}}
               </div>
 
               <hr />
@@ -144,8 +149,8 @@
                 <h4 class="alert-heading">Data Check Results</h4>
                 <p>
                   <span class="text-danger">
-                    <span class="fw-bold"><span id="upload-problems-rows-count"></span> row(s)</span> with
-                    <span class="fw-bold"><span id="upload-problems-data-count"></span> problem(s)</span> or invalid data.
+                    There are <span class="fw-bold"><span id="upload-problems-rows-count"></span> row(s)</span> with incorrect data.
+                    {{-- with <span class="fw-bold"><span id="upload-problems-data-count"></span> problem(s)</span> or invalid data. --}}
                   </span>
                 </p>
               </div>
@@ -271,7 +276,6 @@ var worker = '';
 var previousCampaigns = JSON.parse('@php echo isset($campaign_headers) ? json_encode($campaign_headers) : '{}'; @endphp');
 var previousContacts = JSON.parse('@php echo $contacts->count() > 0 ? json_encode($contacts) : '[]' @endphp');
 var previousUniqueValues = [];
-var editAction = '';
 var tempNewValidMergeContacts = [];
 var tempNewInvalidMergeContacts = [];
 var tempNewValidReplaceContacts = [];
@@ -286,11 +290,10 @@ var tempPreviewTableContacts = [];
     prepareSubmitCampaign();
     showUploadProblemsReport(false, 0, 0);
     checkPreviousUniqueValues();
+    setInputFieldsVisibility(true);
 
     $('#input-campaign-excel-file').val('');
     $('#input-campaign-rows').val('');
-    $('#submit-spinner-save-contacts').hide();
-    $('#submit-spinner-save-contacts-text').hide();
 
     $('#alert-different-templates-container').hide();
     $('#input-campaign-excel-file').removeClass('is-invalid');
@@ -332,25 +335,33 @@ var tempPreviewTableContacts = [];
     });
 
     $('.radio-campaign-edit-action').on('click', function(e) {
-      editAction = $(this).val().toLowerCase();
+      var editAction = $(this).val().toLowerCase();
       previewContactDataContainer.rows().remove().draw();
+      showUploadProblemsReport(false, 0, 0);
 
-      if (editAction === 'merge') {
+      console.log(editAction);
+      console.log('tempNewValidMergeContacts: ' + tempNewValidMergeContacts.length);
+      console.log('tempNewInvalidMergeContacts: ' + tempNewInvalidMergeContacts.length);
+      console.log('tempNewValidReplaceContacts: ' + tempNewValidReplaceContacts.length);
+      console.log('tempNewInvalidReplaceContacts: ' + tempNewInvalidReplaceContacts.length);
+
+      if (editAction == 'merge') {
         if (tempNewValidMergeContacts.length == 0 && tempNewInvalidMergeContacts.length == 0) {
+          $('#progress-bar-title').text('Checking data, please wait...');
+
+          var tempTableContacts = JSON.parse(JSON.stringify(tempPreviewTableContacts));
           var tempPreviousUniques = JSON.parse(JSON.stringify(previousUniqueValues));
 
-          tempPreviewTableContacts.map((valContact, keyContact) => {
+          tempTableContacts.map((valContact, keyContact) => {
             var tempValContact = JSON.parse(JSON.stringify(valContact));
 
-            selectedHeaders.map((val, key) => {
-              if (val.is_unique) {
-                var tempHeaderName = val.header_name.toLowerCase().replaceAll(replacePattern, '_');
-
-                if (tempPreviousUniques.includes(tempValContact[tempHeaderName])) {
-                  tempValContact.errors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data duplicate</small>');
+            tempValContact.col_info.map((valColInfo, keyConInfo) => {
+              if (valColInfo.is_unique) {
+                if (tempPreviousUniques.includes(valColInfo.value)) {
+                  tempValContact.errors.push('<small class="text-danger"><span class="fw-bold">' + valColInfo.name.toUpperCase() + '</span> data duplicate</small>');
                 }
                 else {
-                  tempPreviousUniques.push(tempValContact[tempHeaderName]);
+                  tempPreviousUniques.push(valColInfo.value);
                 }
               }
             });
@@ -359,54 +370,94 @@ var tempPreviewTableContacts = [];
               tempValContact.errors = tempValContact.errors.join('<br>');
               tempNewInvalidMergeContacts.push(tempValContact);
             }
-            else tempNewValidMergeContacts.push(tempValContact);
+            else {
+              tempNewValidMergeContacts.push(tempValContact);
+            }
 
-            // tempValContact = undefined;
+            setTimeout((keyContact, tempTableContacts) => {
+              if (tempTableContacts !== undefined) {
+                var percentage = ((keyContact + 1) / tempTableContacts.length) * 100;
+                $('#progress-bar-title-percentage').text(percentage.toFixed(2));
+              }
+            }, 800, keyContact, tempTableContacts);
+
+            tempValContact = undefined;
+            valColInfo = undefined;
+            keyConInfo = undefined;
           });
+
+          valContact = undefined;
+          keyContact = undefined;
+          tempPreviousUniques = undefined;
+          tempTableContacts = undefined;
         }
 
         if (previousContacts.length > 0) previewContactDataContainer.rows.add(previousContacts).draw();
         if (tempNewValidMergeContacts.length > 0) previewContactDataContainer.rows.add(tempNewValidMergeContacts).draw();
         if (tempNewInvalidMergeContacts.length > 0) previewContactDataContainer.rows.add(tempNewInvalidMergeContacts).draw();
+
+        showUploadProblemsReport(true, tempNewInvalidMergeContacts.length, null);
         $('#input-campaign-rows').val(JSON.stringify(tempNewValidMergeContacts));
       }
-      else if (editAction === 'replace') {
+      else if (editAction == 'replace') {
         if (tempNewValidReplaceContacts.length == 0 && tempNewInvalidReplaceContacts.length == 0) {
+          $('#progress-bar-title').text('Checking data, please wait...');
+
+          var tempTableContacts = JSON.parse(JSON.stringify(tempPreviewTableContacts));
           var tempPreviousUniques = [];
 
-          tempPreviewTableContacts.map((valContact, keyContact) => {
+          tempTableContacts.map((valContact, keyContact) => {
             var tempValContact = JSON.parse(JSON.stringify(valContact));
 
-            selectedHeaders.map((val, key) => {
-              if (val.is_unique) {
-                var tempHeaderName = val.header_name.toLowerCase().replaceAll(replacePattern, '_');
-
-                if (tempPreviousUniques.includes(tempValContact[tempHeaderName])) {
-                  tempValContact.errors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data duplicate</small>');
+            tempValContact.col_info.map((valColInfo, keyColInfo) => {
+              if (valColInfo.is_unique) {
+                if (tempPreviousUniques.includes(valColInfo.value)) {
+                  tempValContact.errors.push('<small class="text-danger"><span class="fw-bold">' + valColInfo.name.toUpperCase() + '</span> data duplicate</small>');
                 }
                 else {
-                  tempPreviousUniques.push(tempValContact[tempHeaderName]);
+                  tempPreviousUniques.push(valColInfo.value);
                 }
               }
             });
 
-            if (tempValContact.errors.length > 0) {
-              tempValContact.errors = tempValContact.errors.join('<br>');
-              tempNewInvalidReplaceContacts.push(tempValContact);
+            if (valContact.errors.length > 0) {
+              valContact.errors = valContact.errors.join('<br>');
+              tempNewInvalidReplaceContacts.push(valContact);
             }
-            else tempNewValidReplaceContacts.push(tempValContact);
+            else tempNewValidReplaceContacts.push(valContact);
 
-            // tempValContact = undefined;
+            setTimeout((keyContact, tempTableContacts) => {
+              if (tempTableContacts !== undefined) {
+                var percentage = ((keyContact + 1) / tempTableContacts.length) * 100;
+                $('#progress-bar-title-percentage').text(percentage);
+              }
+            }, 800, keyContact, tempTableContacts);
+
+            tempValContact = undefined;
+            valContact = undefined;
+            keyContact = undefined;
           });
+
+          tempPreviousUniques = undefined;
+          tempTableContacts = undefined;
         }
 
         if (tempNewValidReplaceContacts.length > 0) previewContactDataContainer.rows.add(tempNewValidReplaceContacts).draw();
         if (tempNewInvalidReplaceContacts.length > 0) previewContactDataContainer.rows.add(tempNewInvalidReplaceContacts).draw();
+
+        showUploadProblemsReport(true, tempNewInvalidReplaceContacts.length, null);
         $('#input-campaign-rows').val(JSON.stringify(tempNewValidReplaceContacts));
       }
 
       $('#btn-submit-create-campaign').removeClass('disabled').removeAttr('disabled');
       setInputFieldsVisibility(true);
+
+      console.log('tempNewValidMergeContacts: ' + tempNewValidMergeContacts.length);
+      console.log('tempNewInvalidMergeContacts: ' + tempNewInvalidMergeContacts.length);
+      console.log('tempNewValidReplaceContacts: ' + tempNewValidReplaceContacts.length);
+      console.log('tempNewInvalidReplaceContacts: ' + tempNewInvalidReplaceContacts.length);
+
+      $('#progress-bar-title').text('Checking data finished');
     });
 
     $('#btn-download-campaign-template').click(function(e) {
@@ -488,6 +539,9 @@ var tempPreviewTableContacts = [];
         });
       }
     }
+    
+    columnDefs = undefined;
+    columns = undefined;
   };
 
   function prepareFailedContactsTable() {
@@ -521,14 +575,23 @@ var tempPreviewTableContacts = [];
   function prepareSubmitCampaign() {
     $('#form-create-campaign').submit(function() {
       var postedNewContacts = JSON.parse($('#input-campaign-rows').val());
+      var editAction = '';
+
+      if ($('#radio-campaign-edit-action-merge').is(':checked')) {
+        editAction = 'merge';
+      }
+      else if ($('#radio-campaign-edit-action-replace').is(':checked')) {
+        editAction = 'replace';
+      };
 
       if (postedNewContacts.length > 0) {
-        if ((editAction.toLowerCase().trim() === 'merge') || (editAction.toLowerCase().trim() === 'replace')) {}
+        if ((editAction === 'merge') || (editAction === 'replace')) {}
         else { return false; }
       }
 
       $('#input-previous-campaign').val(previousCampaigns[0].camp_id);
       $('#input-previous-template').val(previousCampaigns[0].camp_templ_id);
+      $('#progress-bar-title').text('Uploading data, please wait...');
 
       worker.postMessage({
         action: 'hide_interactive_elements'
@@ -540,6 +603,12 @@ var tempPreviewTableContacts = [];
     // showUploadProblemsReport(false, 0, 0);
     $('#alert-different-templates-container').hide();
     $('#input-campaign-rows').val('');
+    // $('#progress-bar-title').text('Checking data, please wait...');
+
+    tempNewValidMergeContacts = [];
+    tempNewInvalidMergeContacts = [];
+    tempNewValidReplaceContacts = [];
+    tempNewInvalidReplaceContacts = [];
 
     worker.postMessage({
       action: 'clear_preview_table'
@@ -566,520 +635,11 @@ var tempPreviewTableContacts = [];
     file = undefined;
   };
 
-  /*
-  async function readExcelData(dataRows) {
-    var tempHeaders = [];
-    var isTemplateOk = true;
-    var tempRowData = [];
-    tempExcelContacts = [];
-
-    selectedHeaders.map((val, key) => {
-      tempHeaders.push({
-        name: val.header_name.toLowerCase().replaceAll(replacePattern, ''),
-        type: val.column_type,
-        is_mandatory: val.is_mandatory,
-        is_unique: val.is_unique
-      });
-    });
-    // console.log(tempHeaders);
-
-    // --- template checking
-    if (dataRows[0].length == tempHeaders.length) {
-      dataRows[0].map((val, key) => {
-        var tempName = val.toLowerCase();
-
-        if (tempName.indexOf('(') > -1) {
-          tempName = val.substr(0, val.indexOf('(')).toLowerCase();
-        }
-        tempName = tempName.replaceAll(replacePattern, '');
-        // console.log(tempName);
-        
-        if (tempName !== tempHeaders[key].name) {
-          isTemplateOk = false;
-        }
-
-        tempName = null;
-      });
-    }
-    else {
-      isTemplateOk = false;
-    }
-
-    if (isTemplateOk) {
-      dataRows.shift();
-
-      var percentage = 0;
-      var dataCount = dataRows.length;
-
-      $.each(dataRows, function(k, v) {
-        var tempNewRow = {};
-        
-        tempHeaders.map((val, key) => {
-          tempNewRow.errors = null;
-          tempNewRow[val.name] = v[key] || '';
-        });
-        
-        tempExcelContacts.push(tempNewRow);
-        percentage = ((tempExcelContacts.length / dataRows.length) * 100).toFixed(2);
-
-        setTimeout((percentage) => {
-          updateProgressBar(percentage);
-        }, 800, percentage);
-
-        tempNewRow = undefined;
-        // console.log('readExcelData: ' + (k + 1));
-      });
-
-      percentage = undefined;
-
-      setTimeout((dataCount) => {
-        if (dataCount > 0) {
-          if (selectedTemplate.id === previousCampaigns[0].camp_templ_id) {
-            setEnabledDataAction(true, true);
-            $('#radio-campaign-edit-action-merge').trigger('click');
-          }
-          else {
-            setEnabledDataAction(false, true);
-            $('#radio-campaign-edit-action-replace').trigger('click');
-          }
-        }
-      }, 1500, dataCount);
-    }
-    else {
-      $('#alert-different-templates-container').show();
-      $('#input-campaign-excel-file').addClass('is-invalid');
-      $('#different-templates-message').show();
-    }
-
-    tempRowData = undefined;
-    isTemplateOk = undefined;
-    tempHeaders = undefined;
-    dataRows = undefined;
-  };
-
-  function checkNewContactData(editAction) {
-    $('#progress-bar-title').text('Data Check Progress');
-
-    var tempHeaderName = '';
-    var failedNewContacts = [];
-    var dataErrorsCount = 0;
-    var tempUniques = [];
-    var percentage = 0;
-    var newTempContacts = tempExcelContacts;
-    tempNewValidContacts = [];
-
-    if (editAction.toLowerCase() === 'merge') {
-      newTempContacts = $.merge( $.merge( [], previousContacts ), tempExcelContacts );
-    }
-    // console.log(editAction);
-    // console.log(tempExcelContacts);
-    // console.log(previousContacts);
-    // console.log(newTempContacts);
-
-    currentCheckValue = 0;
-    totalCheckValue = newTempContacts.length;
-
-    $.each(newTempContacts, function(keyContact, valContact) {
-      // console.log('checkNewContactData: ' + (keyContact + 1));
-      var tempNewRow = {};
-      var tempErrors = [];
-      var isContentOk = true;
-
-      selectedHeaders.map((valHeader, keyHeader) => {
-        tempHeaderName = valHeader.header_name.toLowerCase().replaceAll(replacePattern, '_');
-        tempNewRow[tempHeaderName] = valContact[tempHeaderName];
-        // console.log('tempHeaderName: ' + tempHeaderName + ': ' + valContact[tempHeaderName]);
-
-        if (isNaN(tempNewRow[tempHeaderName])) {
-          tempNewRow[tempHeaderName] = tempNewRow[tempHeaderName].trim();
-        }
-
-        switch (valHeader.column_type) {
-          case 'numeric':
-            if ((tempNewRow[tempHeaderName].length > 0) && isNaN(tempNewRow[tempHeaderName])) {
-              tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
-              isContentOk = false;
-              dataErrorsCount++;
-            }
-            break;
-          case 'datetime':
-            if (tempNewRow[tempHeaderName].length > 0) {
-              var dateTime = luxon.DateTime.fromFormat(tempNewRow[tempHeaderName], 'yyyy-MM-dd HH:mm:ss');
-              if (!dateTime.isValid) {
-                tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
-                isContentOk = false;
-                dataErrorsCount++;
-              }
-              // console.log(tempHeaderName + ' ' + valHeader.type + ' ' + tempNewRow[tempHeaderName] + ' isValid: ' + dateTime.isValid);
-              dateTime = undefined;
-            }
-            break;
-          case 'date':
-            if (tempNewRow[tempHeaderName].length > 0) {
-              var dateTime = luxon.DateTime.fromFormat(tempNewRow[tempHeaderName], 'yyyy-MM-dd');
-              if (!dateTime.isValid) {
-                tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
-                isContentOk = false;
-                dataErrorsCount++;
-              }
-              // console.log(tempHeaderName + ' ' + valHeader.type + ' ' + tempNewRow[tempHeaderName] + ' isValid: ' + dateTime.isValid);
-              dateTime = undefined;
-            }
-            break;
-          case 'time':
-            if (tempNewRow[tempHeaderName].length > 0) {
-              var dateTime = luxon.DateTime.fromFormat(tempNewRow[tempHeaderName], 'HH:mm:ss');
-              if (!dateTime.isValid) {
-                tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
-                isContentOk = false;
-                dataErrorsCount++;
-              }
-              // console.log(tempHeaderName + ' ' + valHeader.type + ' ' + tempNewRow[tempHeaderName] + ' isValid: ' + dateTime.isValid);
-              dateTime = undefined;
-            }
-            break;
-          case 'handphone':
-            // console.log(tempHeaderName + ' ' + valHeader.type + ' ' + tempNewRow[tempHeaderName]);
-            if (tempNewRow[tempHeaderName].length > 0) {
-              if (isNaN(tempNewRow[tempHeaderName])) {
-                tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
-                isContentOk = false;
-                dataErrorsCount++;
-              }
-              else {
-                var phone = libphonenumber.parsePhoneNumber(tempNewRow[tempHeaderName], 'ID');
-                if (!phone.isValid()) {
-                  tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
-                  isContentOk = false;
-                  dataErrorsCount++;
-                }
-                phone = undefined;
-              }
-            }
-            break;
-          default: break;
-        }
-        
-        if (valHeader.is_mandatory) {
-          if (tempNewRow[tempHeaderName].length == 0) {
-            tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
-            isContentOk = false;
-            dataErrorsCount++;
-          }
-        }
-        
-        if (valHeader.is_unique) {
-          if ((tempNewRow[tempHeaderName].length > 0) && tempUniques.includes(tempNewRow[tempHeaderName])) {
-            tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data duplicate</small>');
-            isContentOk = false;
-            dataErrorsCount++;
-          }
-          else {
-            tempUniques.push(tempNewRow[tempHeaderName]);
-          }
-        }
-      });
-
-      // if (isContentOk) {
-      //   if (valContact.cont_created_at === undefined) {
-      //     tempNewValidContacts.push(tempNewRow);
-      //   }
-      // }
-      // else {
-      //   tempNewRow.errors = tempErrors.join('<br>');
-      //   newTempContacts[keyContact] = tempNewRow;
-      //   failedNewContacts.push(tempNewRow);
-      // }
-
-      percentage = (((keyContact + 1) / newTempContacts.length) * 100).toFixed(2);
-      setTimeout((percentage) => {
-        updateProgressBar(percentage);
-      }, 800, percentage);
-
-      isContentOk = undefined;
-      tempErrors = undefined;
-      tempNewRow = undefined;
-    });
-
-    setTimeout((previewContactDataContainer, failedNewContacts, dataErrorsCount, newTempContacts, tempNewValidContacts) => {
-      if (failedNewContacts.length > 0) {
-        showUploadProblemsReport(true, failedNewContacts.length, dataErrorsCount);
-      }
-
-      previewContactDataContainer.rows().remove().draw();
-      previewContactDataContainer.rows.add(newTempContacts).draw();
-      $('#input-campaign-rows').val(JSON.stringify(tempNewValidContacts));
-    }, 1500, previewContactDataContainer, failedNewContacts, dataErrorsCount, newTempContacts, tempNewValidContacts);
-
-    newTempContacts = undefined;
-    percentage = undefined;
-    tempUniques = undefined;
-    dataErrorsCount = undefined;
-    failedNewContacts = undefined;
-    tempHeaderName = undefined;
-  };
-  */
-
-  /*
   async function readExcelData(dataRows) {
     var tempHeaders = [];
     var isTemplateOk = true;
     var tempRowData = [];
     var tempUniques = [];
-    
-    tempNewValidContacts = [];
-    tempNewInvalidContacts = [];
-
-    selectedHeaders.map((val, key) => {
-      tempHeaders.push({
-        name: val.header_name.toLowerCase().replaceAll(replacePattern, ''),
-        type: val.column_type,
-        is_mandatory: val.is_mandatory,
-        is_unique: val.is_unique
-      });
-    });
-    // console.log(tempHeaders);
-
-    // --- template checking
-    if (dataRows[0].length == tempHeaders.length) {
-      dataRows[0].map((val, key) => {
-        var tempName = val.toLowerCase();
-
-        if (tempName.indexOf('(') > -1) {
-          tempName = val.substr(0, val.indexOf('(')).toLowerCase();
-        }
-        tempName = tempName.replaceAll(replacePattern, '');
-        // console.log(tempName);
-        
-        if (tempName !== tempHeaders[key].name) {
-          isTemplateOk = false;
-        }
-
-        tempName = null;
-      });
-    }
-    else {
-      isTemplateOk = false;
-    }
-
-    if (isTemplateOk) {
-      var tempDataRows = [];
-      var newTempContacts = [];
-      var percentage = 0;
-      var dataCount = 0;
-      var dataErrorsCount = 0;
-      var tempPreviewTableContacts = [];
-
-      dataRows.map((v, k) => {
-        tempDataRows.push(v);
-      });
-      tempDataRows.shift();
-
-      if (editAction === 'merge') {
-        var tempPreviousContacs = [];
-        // console.log(previousContacts);
-
-        previousContacts.map((valPrevContact, keyPrevContact) => {
-          var tempContact = [];
-          tempHeaders.map((valHeader, keyHeader) => {
-            tempContact.push(valPrevContact[valHeader.name]);
-          });
-          tempContact['cont_created_at'] = valPrevContact.cont_created_at;
-          tempPreviousContacs.push(tempContact);
-          tempContact = undefined;
-        });
-        // console.log(tempPreviousContacs);
-        newTempContacts = $.merge( $.merge( [], tempPreviousContacs ), tempDataRows );
-      }
-      else {
-        newTempContacts = tempDataRows;
-      }
-      // console.log(newTempContacts);
-
-      dataCount = newTempContacts.length;
-
-      newTempContacts.map((valDataRow, keyDataRow) => {
-        var tempNewRow = {};
-        var tempHeaderName = '';
-        var tempErrors = [];
-        var isContentOk = true;
-
-        tempHeaders.map((valHeader, keyHeader) => {
-          tempHeaderName = valHeader.name;
-          tempNewRow[tempHeaderName] = valDataRow[keyHeader];
-          // console.log('tempHeaderName: ' + tempHeaderName + ', type: ' + valHeader.type + ', tempNewRow[tempHeaderName]: ' + tempNewRow[tempHeaderName]);
-
-          if (tempNewRow[tempHeaderName] === undefined) {
-            tempNewRow[tempHeaderName] = '';
-          }
-
-          switch (valHeader.type) {
-            case 'numeric':
-              if ((tempNewRow[tempHeaderName].length > 0) && isNaN(tempNewRow[tempHeaderName])) {
-                tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
-                isContentOk = false;
-                dataErrorsCount++;
-              }
-              break;
-            case 'datetime':
-              if (tempNewRow[tempHeaderName].length > 0) {
-                var dateTime = luxon.DateTime.fromFormat(tempNewRow[tempHeaderName], 'yyyy-MM-dd HH:mm:ss');
-                if (!dateTime.isValid) {
-                  tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
-                  isContentOk = false;
-                  dataErrorsCount++;
-                }
-                // console.log(tempHeaderName + ' ' + valHeader.type + ' ' + tempNewRow[tempHeaderName] + ' isValid: ' + dateTime.isValid);
-                dateTime = undefined;
-              }
-              break;
-            case 'date':
-              if (tempNewRow[tempHeaderName].length > 0) {
-                var dateTime = luxon.DateTime.fromFormat(tempNewRow[tempHeaderName], 'yyyy-MM-dd');
-                if (!dateTime.isValid) {
-                  tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
-                  isContentOk = false;
-                  dataErrorsCount++;
-                }
-                // console.log(tempHeaderName + ' ' + valHeader.type + ' ' + tempNewRow[tempHeaderName] + ' isValid: ' + dateTime.isValid);
-                dateTime = undefined;
-              }
-              break;
-            case 'time':
-              if (tempNewRow[tempHeaderName].length > 0) {
-                var dateTime = luxon.DateTime.fromFormat(tempNewRow[tempHeaderName], 'HH:mm:ss');
-                if (!dateTime.isValid) {
-                  tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
-                  isContentOk = false;
-                  dataErrorsCount++;
-                }
-                // console.log(tempHeaderName + ' ' + valHeader.type + ' ' + tempNewRow[tempHeaderName] + ' isValid: ' + dateTime.isValid);
-                dateTime = undefined;
-              }
-              break;
-            case 'handphone':
-              // console.log(tempHeaderName + ' ' + valHeader.type + ' ' + tempNewRow[tempHeaderName]);
-              if (tempNewRow[tempHeaderName].length > 0) {
-                if (isNaN(tempNewRow[tempHeaderName])) {
-                  tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
-                  isContentOk = false;
-                  dataErrorsCount++;
-                }
-                else {
-                  var phone = libphonenumber.parsePhoneNumber(tempNewRow[tempHeaderName], 'ID');
-                  if (!phone.isValid()) {
-                    tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
-                    isContentOk = false;
-                    dataErrorsCount++;
-                  }
-                  phone = undefined;
-                }
-              }
-              break;
-            default: break;
-          }
-          
-          if (valHeader.is_mandatory) {
-            if (tempNewRow[tempHeaderName].length == 0) {
-              tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
-              isContentOk = false;
-              dataErrorsCount++;
-            }
-          }
-          
-          if (valHeader.is_unique) {
-            if ((tempNewRow[tempHeaderName].length > 0) && tempUniques.includes(tempNewRow[tempHeaderName])) {
-              tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data duplicate</small>');
-              isContentOk = false;
-              dataErrorsCount++;
-            }
-            else {
-              tempUniques.push(tempNewRow[tempHeaderName]);
-            }
-          }
-        });
-
-        if (isContentOk) {
-          tempNewRow['errors'] = null;
-          if (valDataRow.cont_created_at === undefined) {
-            tempNewValidContacts.push(tempNewRow);
-          }
-        }
-        else {
-          tempNewRow['errors'] = tempErrors.join('<br>');
-          tempNewInvalidContacts.push(tempNewRow);
-        }
-        
-        tempPreviewTableContacts.push(tempNewRow);
-        percentage = ((tempPreviewTableContacts.length / dataCount) * 100).toFixed(2);
-
-        setTimeout((percentage) => {
-          updateProgressBar(percentage);
-        }, 800, percentage);
-
-        tempNewRow = undefined;
-      });
-
-      
-      setTimeout((tempPreviewTableContacts) => {
-        if (tempNewInvalidContacts.length > 0) {
-          showUploadProblemsReport(true, tempNewInvalidContacts.length, dataErrorsCount);
-        }
-
-        if (selectedTemplate.id === previousCampaigns[0].camp_templ_id) {
-          setEnabledDataAction(true, true);
-        } else {
-          setEnabledDataAction(false, true);
-          $('#radio-campaign-edit-action-replace').prop('checked', 'checked');
-          editAction = 'replace';
-        }
-
-        $('#input-campaign-rows').val(JSON.stringify(tempNewValidContacts));
-        $('#btn-submit-create-campaign').removeClass('disabled').removeAttr('disabled');
-        $('#input-campaign-excel-file').removeClass('is-invalid');
-        $('#different-templates-message').hide();
-        previewContactDataContainer.rows.add(tempPreviewTableContacts).draw();
-
-        worker.postMessage({
-          action: 'show_interactive_elements'
-        });
-        
-      }, 1500, tempPreviewTableContacts);
-
-      tempPreviewTableContacts = undefined;
-      percentage = undefined;
-      newTempContacts = undefined;
-      tempDataRows = undefined;
-    }
-    else {
-      $('#input-campaign-excel-file').addClass('is-invalid');
-      $('#different-templates-message').show();
-      $('#alert-different-templates-container').show();
-      $('#btn-submit-create-campaign').addClass('disabled').attr('disabled', 'disabled');
-
-      worker.postMessage({
-        action: 'show_interactive_elements'
-      });
-    }
-
-    tempUniques = undefined;
-    tempRowData = undefined;
-    isTemplateOk = undefined;
-    tempHeaders = undefined;
-  };
-  */
-
-  async function readExcelData(dataRows) {
-    var tempHeaders = [];
-    var isTemplateOk = true;
-    var tempRowData = [];
-    var tempUniques = [];
-    
-    
-    tempNewValidMergeContacts = [];
-    tempNewInvalidMergeContacts = [];
-    tempNewValidReplaceContacts = [];
-    tempNewInvalidReplaceContacts = [];
 
     selectedHeaders.map((val, key) => {
       tempHeaders.push({
@@ -1125,14 +685,16 @@ var tempPreviewTableContacts = [];
       previousUniqueValues.map((valUnique, keyUnique) => {
         tempPreviousUniques.push(valUnique);
       });
-      // console.log(tempPreviousUniques);
-      // console.log(tempPreviousUniques.length);
 
       dataRows.shift();
       dataCount = dataRows.length;
 
       dataRows.map((valDataRow, keyDataRow) => {
-        var tempNewRow = {};
+        var tempNewRow = {
+          col_info: [],
+          errors: [],
+          value: ''
+        };
         var tempHeaderName = '';
         var tempErrors = [];
         var tempReplaceActionErrors = [];
@@ -1144,7 +706,6 @@ var tempPreviewTableContacts = [];
         tempHeaders.map((valHeader, keyHeader) => {
           tempHeaderName = valHeader.name;
           tempNewRow[tempHeaderName] = valDataRow[keyHeader];
-          tempNewRow['errors'] = [];
           // console.log('tempHeaderName: ' + tempHeaderName + ', type: ' + valHeader.type + ', tempNewRow[tempHeaderName]: ' + tempNewRow[tempHeaderName]);
 
           if (tempNewRow[tempHeaderName] === undefined || tempNewRow[tempHeaderName] === null) {
@@ -1153,46 +714,47 @@ var tempPreviewTableContacts = [];
 
           switch (valHeader.type) {
             case 'numeric':
-              if ((tempNewRow[tempHeaderName].length > 0) && isNaN(tempNewRow[tempHeaderName])) {
+              tempNewRow.col_info.push({ name: tempHeaderName, type: valHeader.type, value: tempNewRow[tempHeaderName], is_unique: valHeader.is_unique });
+              if ((tempNewRow[tempHeaderName].length > 0) && isNaN(tempNewRow[tempHeaderName].value)) {
                 tempNewRow.errors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
                 dataErrorsCount++;
               }
               break;
             case 'datetime':
+              tempNewRow.col_info.push({ name: tempHeaderName, type: valHeader.type, value: tempNewRow[tempHeaderName], is_unique: valHeader.is_unique });
               if (tempNewRow[tempHeaderName].length > 0) {
                 var dateTime = luxon.DateTime.fromFormat(tempNewRow[tempHeaderName], 'yyyy-MM-dd HH:mm:ss');
                 if (!dateTime.isValid) {
                   tempNewRow.errors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
                   dataErrorsCount++;
                 }
-                // console.log(tempHeaderName + ' ' + valHeader.type + ' ' + tempNewRow[tempHeaderName] + ' isValid: ' + dateTime.isValid);
                 dateTime = undefined;
               }
               break;
             case 'date':
+              tempNewRow.col_info.push({ name: tempHeaderName, type: valHeader.type, value: tempNewRow[tempHeaderName], is_unique: valHeader.is_unique });
               if (tempNewRow[tempHeaderName].length > 0) {
                 var dateTime = luxon.DateTime.fromFormat(tempNewRow[tempHeaderName], 'yyyy-MM-dd');
                 if (!dateTime.isValid) {
                   tempNewRow.errors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
                   dataErrorsCount++;
                 }
-                // console.log(tempHeaderName + ' ' + valHeader.type + ' ' + tempNewRow[tempHeaderName] + ' isValid: ' + dateTime.isValid);
                 dateTime = undefined;
               }
               break;
             case 'time':
+              tempNewRow.col_info.push({ name: tempHeaderName, type: valHeader.type, value: tempNewRow[tempHeaderName], is_unique: valHeader.is_unique });
               if (tempNewRow[tempHeaderName].length > 0) {
                 var dateTime = luxon.DateTime.fromFormat(tempNewRow[tempHeaderName], 'HH:mm:ss');
                 if (!dateTime.isValid) {
                   tempNewRow.errors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
                   dataErrorsCount++;
                 }
-                // console.log(tempHeaderName + ' ' + valHeader.type + ' ' + tempNewRow[tempHeaderName] + ' isValid: ' + dateTime.isValid);
                 dateTime = undefined;
               }
               break;
             case 'handphone':
-              // console.log(tempHeaderName + ' ' + valHeader.type + ' ' + tempNewRow[tempHeaderName]);
+              tempNewRow.col_info.push({ name: tempHeaderName, type: valHeader.type, value: tempNewRow[tempHeaderName], is_unique: valHeader.is_unique });
               if (tempNewRow[tempHeaderName].length > 0) {
                 if (isNaN(tempNewRow[tempHeaderName])) {
                   tempNewRow.errors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
@@ -1208,7 +770,9 @@ var tempPreviewTableContacts = [];
                 }
               }
               break;
-            default: break;
+            default:
+              tempNewRow.col_info.push({ name: tempHeaderName, type: valHeader.type, value: tempNewRow[tempHeaderName], is_unique: valHeader.is_unique });
+              break;
           }
           
           if (valHeader.is_mandatory) {
@@ -1220,22 +784,28 @@ var tempPreviewTableContacts = [];
         });
         
         tempPreviewTableContacts.push(tempNewRow);
-        percentage = (((keyDataRow + 1) / dataCount) * 100).toFixed(2);
 
-        setTimeout((percentage) => {
-          updateProgressBar(percentage);
-        }, 800, percentage);
+        // ---
+        // --- these lines to update progress bar
+        // ---
+        // percentage = (((keyDataRow + 1) / dataCount) * 100).toFixed(2);
+        // setTimeout((percentage) => {
+        //   updateProgressBar(percentage);
+        // }, 800, percentage);
 
+        // console.log(tempNewRow);
         tempNewRow = undefined;
       });
       
+      console.log('contacts: ' + tempPreviewTableContacts.length);
+
       setTimeout(() => {
         if (selectedTemplate.id === previousCampaigns[0].camp_templ_id) {
-          $('#radio-campaign-edit-action-merge').trigger('click');
           setEnabledDataAction(true, true);
+          $('#radio-campaign-edit-action-merge').trigger('click');
         } else {
-          $('#radio-campaign-edit-action-replace').trigger('click');
           setEnabledDataAction(false, true);
+          $('#radio-campaign-edit-action-replace').trigger('click');
         }
       }, 1500);
 
@@ -1276,6 +846,7 @@ var tempPreviewTableContacts = [];
       $('#submit-spinner-save-contacts').hide();
       $('#submit-spinner-save-contacts-text').hide();
       $('.btn-back').removeClass('disabled');
+      $('.spinner-border').hide();
     }
     else {
       $('#input-campaign-name').attr('disabled', 'disabled');
@@ -1285,6 +856,7 @@ var tempPreviewTableContacts = [];
       $('#submit-spinner-save-contacts').show();
       $('#submit-spinner-save-contacts-text').show();
       $('.btn-back').addClass('disabled');
+      $('.spinner-border').show();
       setEnabledDataAction(false, false);
     }
   };

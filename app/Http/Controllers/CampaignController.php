@@ -355,48 +355,33 @@ class CampaignController extends Controller
             return back()->withErrors($validator)->withInput();
         }
 
-        $campaign = Campaign::find($id);
+        $campaign = Campaign::find($request->previous_campaign);
         // dd($campaign);
 
         if ($campaign != null) {
-            $refHeaders = [];
-            $templateHeaders = Template::select(
-                    'templates.id AS templ_id', 'templates.reference_table AS templ_ref_table',
-                    'template_headers.name AS th_name', 'template_headers.column_type AS th_column_type', 'template_headers.is_mandatory AS th_is_mandatory',
-                    'template_headers.is_unique AS th_is_unique', 'template_headers.is_voice AS th_is_voice'
-                )
-                ->leftJoin('template_headers', 'templates.id' , '=', 'template_headers.template_id')
-                ->where('templates.id', $request->selected_template)
-                ->get();
-            // dd($templateHeaders);
+            $template = Template::find($request->selected_template);
+            // dd($template);
 
-            if ($templateHeaders->count() > 0) {
-                foreach ($templateHeaders AS $keyHeaders => $valHeader) {
-                    $refHeaders[] = [
-                        'name' => strtolower(preg_replace('/\W+/i', '_', $valHeader->th_name)),
-                        'type' => $valHeader->th_column_type,
-                    ];
-                }
-            }
-            // dd($refHeaders);
-
-            if ((isset($request->input_campaign_rows) && !empty($request->input_campaign_rows))) {
+            if (
+                $template
+                && isset($request->input_campaign_rows)
+                && !empty($request->input_campaign_rows)
+            ) {
                 // -- connection with sip
-                $sip = DB::connection('sip')
-                        ->table('sip')
-                        ->selectRaw('DISTINCT(id) as extension, data as callerid')
-                        ->where('keyword', 'callerid')
-                        ->where('id', 'like', env('SIP_PREFIX_EXT').'%')
-                        ->orderBy(DB::raw('RAND()'))
-                        ->get();
-                $sipIdxCount = $sip->count() - 1;
-                $rand = 0;
+                // $sip = DB::connection('sip')
+                //         ->table('sip')
+                //         ->selectRaw('DISTINCT(id) as extension, data as callerid')
+                //         ->where('keyword', 'callerid')
+                //         ->where('id', 'like', env('SIP_PREFIX_EXT').'%')
+                //         ->orderBy(DB::raw('RAND()'))
+                //         ->get();
+                // $sipIdxCount = $sip->count() - 1;
+                // $rand = 0;
                 
                 $newCampaignRows = json_decode($request->input_campaign_rows);
                 // dd($newCampaignRows);
 
-                $headerName = '';
-                $tempReferenceTable = $templateHeaders[0]->templ_ref_table; // dd($tempReferenceTable);
+                $tempReferenceTable = $template->reference_table; // dd($tempReferenceTable);
                 $tempDateTime = '';
                 $tempContactPhone = '';
                 $tempContactNominal = 0;
@@ -411,7 +396,7 @@ class CampaignController extends Controller
                         ->delete();
 
                     $campaign->total_data = 0;
-                    $campaign->template_id = $templateHeaders[0]->templ_id;
+                    $campaign->template_id = $template->id;
                     $campaign->reference_table = $tempReferenceTable;
                 }
 
@@ -420,24 +405,24 @@ class CampaignController extends Controller
                     $tempContactPhone = '';
                     $tempContactNominal = 0;
                     $tempContactDate = '';
-                    $refContent = [];
+                    $tempContact = null;
                     $sipExtension = null;
                     $sipCallerId = null;
                     $sipVoice = null;
 
-                    foreach ($refHeaders AS $keyHeader => $valHeader) {
-                        $headerName = strtolower(preg_replace('/\W+/i', '_', $valHeader['name']));
-                        $refContent[$headerName] = $valCampaignRow->$headerName;
+                    foreach ($valCampaignRow->col_info AS $keyColInfo => $valColInfo) {
+                        // dd($valData);
+                        if ($valColInfo->type === 'handphone') {
+                            $tempContactPhone = $valColInfo->value;
+                        }
+                        else if ($valColInfo->type === 'numeric') {
+                            $tempContactNominal = $valColInfo->value;
+                        }
+                        else if ($valColInfo->type === 'date') {
+                            $tempContactDate = $valColInfo->value;
+                        }
 
-                        if ($valHeader['type'] === 'handphone') {
-                            $tempContactPhone = $valCampaignRow->$headerName;
-                        }
-                        else if ($valHeader['type'] === 'numeric') {
-                            $tempContactNominal = $valCampaignRow->$headerName;
-                        }
-                        else if ($valHeader['type'] === 'date') {
-                            $tempContactDate = $valCampaignRow->$headerName;
-                        }
+                        unset($valColInfo, $keyColInfo);
                     }
 
                     try {
@@ -462,25 +447,29 @@ class CampaignController extends Controller
                             'updated_at' => $tempDateTime->format('Y-m-d H:i:s'),
                         ]);
 
-                        $refContent['campaign_id'] = $campaign->id;
-                        $refContent['contact_id'] = $tempContact->id;
-                        $refContent['created_at'] = $tempDateTime->format('Y-m-d H:i:s');
-                        $refContent['updated_at'] = $tempDateTime->format('Y-m-d H:i:s');
-                        // dd($refContent);
+                        unset($valCampaignRow->col_info, $valCampaignRow->errors, $valCampaignRow->value);
+                        $valCampaignRow->campaign_id = $campaign->id;
+                        $valCampaignRow->contact_id = $tempContact->id;
+                        $valCampaignRow->created_at = $tempDateTime->format('Y-m-d H:i:s');
+                        $valCampaignRow->updated_at = $tempDateTime->format('Y-m-d H:i:s');
+                        // dd($valCampaignRow);
 
-                        DB::table($tempReferenceTable)->insert($refContent);
+                        DB::table($tempReferenceTable)->insert((array) $valCampaignRow);
                         $tempTotalValidData++;
                     } catch (QueryException $ex) {
                         // dd($ex);
                     }
 
                     unset(
-                        $sipVoice, $sipCallerId, $sipExtension, $refContent, $tempContactDate, $tempContactNominal, $tempContactPhone,
+                        $sipVoice, $sipCallerId, $sipExtension,
+                        $tempContact, $tempContactDate, $tempContactNominal, $tempContactPhone,
                         $tempDateTime, $valCampaignRow
                     );
                 }
 
                 $campaign->total_data += $tempTotalValidData;
+
+                unset($tempReferenceTable, $tempDateTime, $tempContactPhone, $tempContactNominal, $tempTotalValidData);
             }
             // dd($refContent);
 
@@ -489,7 +478,7 @@ class CampaignController extends Controller
         }
 
         // dd($campaign);
-
+        unset($campaign);
         return redirect()->route('campaigns.index');
     }
 
