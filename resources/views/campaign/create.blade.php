@@ -47,10 +47,12 @@
               </div>
               @endif
 
+              {{--
               <div id="alert-different-templates-container" class="alert alert-danger alert-dismissible fade show" role="alert">
                 <h4 class="alert-heading">Campaign Creation Error</h4>
                 <p><span class="fw-bold">Upload Contacts Data File</span> structure does not match the selected <span class="fw-bold">Campaign Template</span> structure.</p>
               </div>
+              --}}
 
               <!-- campaign name -->
               <div class="col-md-12">
@@ -198,9 +200,21 @@
                     &nbsp; Contacts Data Template
                   </button>
                 </div>
+
+                <div id="different-templates-message" class="invalid-feedback mt-1 mb-1" style="display:block">
+                  <span class="fw-bold">Upload Contacts Data File</span> structure does not match the selected <span class="fw-bold">Campaign Template</span>
+                  structure.
+                </div>
               </div>
 
+              <!-- progress animation -->
               <div class="col-md-12 mt-3 mb-4">
+                <label id="progress-bar-title" class="form-label disabled">Progress</label>&nbsp;
+                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+
+                {{----}}
                 <div class="progress" style="height:50px;">
                   <div
                       id="progress-bar-value"
@@ -210,6 +224,7 @@
                       style="width:0%"
                   >0%</div>
                 </div>
+                {{----}}
               </div>
 
               <hr />
@@ -329,37 +344,42 @@
 
 @push('javascript')
 <script src="{{ url('js/xlsx.full.min.js') }}"></script>
-<script src="{{ url('js/luxon.min.js') }}"></script>
-<script src="https://unpkg.com/libphonenumber-js@1.9.6/bundle/libphonenumber-max.js"></script>
 <script type="text/javascript">
 var previewContactDataContainer = $('#table-preview-contact-data-container').DataTable();
-var failedContactDataContainer = '';
 var templates = JSON.parse('@php echo !empty($templates) ? json_encode($templates) : '[]' @endphp');
 var selectedTemplate = '';
 var selectedHeaders = '';
 var replacePattern = /\W+/ig;
-var editAction = 'replace';
-
 var worker = '';
+
+var editAction = 'replace';
+var tempAllContacts = [];
+var tempValidContacts = [];
+var invalidRowsCount = 0;
+var invalidDataCount = 0;
 
   $(document).ready(function() {
     initWorker();
     preparePreviewContactTable(0);
-    // prepareFailedContactsTable();
-    // prepareSubmitCampaign();
+    prepareSubmitCampaign();
     showUploadProblemsReport(false, 0, 0);
+    showTemplateError(false);
+    setInputFieldsDisplayed(true);
 
     $('#input-campaign-excel-file').val('');
     $('#input-campaign-rows').val('');
-    $('#submit-spinner-save-contacts').hide();
-    $('#submit-spinner-save-contacts-text').hide();
-    $('#alert-different-templates-container').hide();
 
     $('#input-campaign-excel-file').on("change", function(e) {
-      // showProgressBarContainer(true);
-      $('#progress-bar-value').text('0%');
-      $('#progress-bar-value').css('width', '0%');
-      // previewContactDataContainer.rows().remove().draw();
+      updateProgressBar(0);
+      setInputFieldsDisplayed(false);
+      showTemplateError(false);
+      showUploadProblemsReport(false, 0, 0);
+
+      worker.postMessage({
+        action: 'change_element_text',
+        element: '#progress-bar-title',
+        text: 'Reading file ...'
+      });
 
       setTimeout(() => {
         handleFileAsync(e);
@@ -367,11 +387,7 @@ var worker = '';
     });
 
     $('#option-campaign-templates').on('change', function(e) {
-      $('#progress-bar-value').text('0%');
-      $('#progress-bar-value').css('width', '0%');
-
-      var templateId = 't_' + $(this).val();
-      selectedTemplate = templates[templateId];
+      selectedTemplate = templates['t_' + $(this).val()];
       selectedHeaders = selectedTemplate.headers;
 
       var inputFileContainer = $('#input-campaign-excel-file');
@@ -379,10 +395,11 @@ var worker = '';
       $(inputFileContainer).val('');
       
       $('#campaign-text-voice').val(selectedTemplate.voice_text);
-      $('#alert-different-templates-container').hide();
       $('#input-campaign-rows').val('');
 
+      updateProgressBar(0);
       showUploadProblemsReport(false, 0, 0);
+      showTemplateError(false);
       preparePreviewContactTable();
     });
 
@@ -396,12 +413,6 @@ var worker = '';
     });
 
     $('#option-campaign-templates').trigger('change');
-
-    // $('#progress-bar-value').
-
-    @if (isset($failed_contacts))
-    populateFailedContacts();
-    @endif
   });
 
   function preparePreviewContactTable() {
@@ -437,7 +448,10 @@ var worker = '';
           if (v.column_type === 'numeric') {
             columnDefs.push({
               targets: k,
-              className: 'dt-body-right'
+              className: 'dt-body-right',
+              render: function(data, type, row, meta) {
+                return data.toLocaleString('id-ID');
+              }
             });
           }
         });
@@ -458,49 +472,56 @@ var worker = '';
     }
   };
 
-  function prepareFailedContactsTable() {
-    failedContactDataContainer = $('#table-failed-contacts-container').DataTable({
-      processing: true,
-      lengthMenu: [5, 10, 15, 20, 50, 100],
-      pageLength: 10,
-      columns: [
-        { data: 'account_id' },
-        { data: 'name' },
-        { data: 'phone' },
-        { data: 'bill_date' },
-        { data: 'due_date' },
-        { data: 'nominal' },
-        { 
-          data: 'failed',
-          render: function(data, type) {
-            return '<span class="text-danger">' + data + '</span>';
-          }
-        }
-      ],
-      columnDefs: [
-        {
-          targets: 5,
-          className: 'dt-body-right'
-        }
-      ]
-    });
-  };
-
   function prepareSubmitCampaign() {
     $('#form-create-campaign').submit(function() {
-      if (($('#input-campaign-name').val().trim().length < 5) || ($('#input-campaign-rows').val().trim() === '')) {
+      var tempPostedContacts = $('#input-campaign-rows').val();
+
+      if (tempPostedContacts.trim() !== '') {
+        var postedNewContacts = JSON.parse(tempPostedContacts);
+        var editAction = 'replace';
+
+        if (($('#input-campaign-name').val().trim().length < 5) || ($('#input-campaign-rows').val().trim() === '')) {
+          return false;
+        }
+
+        var isConfirmSubmit = true;
+        if (postedNewContacts.length > 10000) {
+          isConfirmSubmit = confirm('You are going to upload more than 10.000 data. This might slow your system down.\r\n\r\nAre you sure?');
+        }
+        
+        if (!isConfirmSubmit)
+          return false;
+
+        worker.postMessage({
+          action: 'change_element_text',
+          element: '#progress-bar-title',
+          text: 'Uploading data, please wait...'
+        });
+
+        worker.postMessage({
+          action: 'hide_interactive_elements'
+        });
+
+        isConfirmSubmit = undefined;
+        editAction = undefined;
+        postedNewContacts = undefined;
+        tempPostedContacts = undefined;
+      }
+      else {
+        showTemplateError(true);
+        tempPostedContacts = undefined;
         return false;
       }
-
-      worker.postMessage({
-        action: 'hide_interactive_elements'
-      });
     });
   };
 
   async function handleFileAsync(e) {
-    showUploadProblemsReport(false, 0, 0);
-    $('#alert-different-templates-container').hide();
+    tempAllContacts = [];
+    tempValidContacts = [];
+    invalidRowsCount = 0;
+    invalidDataCount = 0;
+    previewContactDataContainer.rows().remove().draw();
+    
     $('#input-campaign-rows').val('');
 
     var file = e.target.files[0];
@@ -517,276 +538,114 @@ var worker = '';
 
       workbook = undefined;
       fileArrayBuffer = undefined;
-      
-      if (typeof previousCampaigns !== 'undefined') {
-        if (previousCampaigns[0].camp_templ_id !== selectedTemplate.id) {
-          setEnabledDataAction(true, true);
-          $('#radio-campaign-edit-action-merge').trigger('click');
-        }
-        else {
-          setEnabledDataAction(false, true);
-          $('#radio-campaign-edit-action-replace').trigger('click');
-        }
+
+      // var tempUniques = [];
+      var tempHeaders = [];
+      selectedHeaders.map((val, key) => {
+        tempHeaders.push({
+          name: val.header_name.toLowerCase().replaceAll(replacePattern, ''),
+          type: val.column_type,
+          is_mandatory: val.is_mandatory,
+          is_unique: val.is_unique
+        });
+      });
+      // console.log(tempHeaders);
+
+      // --- template checking
+      var isTemplateOk = true;
+      if (dataRows[0].length == tempHeaders.length) {
+        dataRows[0].map((val, key) => {
+          var tempName = val.toLowerCase();
+
+          if (tempName.indexOf('(') > -1) {
+            tempName = val.substr(0, val.indexOf('(')).toLowerCase();
+          }
+          tempName = tempName.replaceAll(replacePattern, '');
+          // console.log(tempName);
+          
+          if (tempName !== tempHeaders[key].name) {
+            isTemplateOk = false;
+          }
+
+          tempName = null;
+        });
       }
       else {
-        runReadExcelData(dataRows);
+        isTemplateOk = false;
+      }
+      // console.log(isTemplateOk);
+
+      if (isTemplateOk) {
+        worker.postMessage({
+          action: 'change_element_text',
+          element: '#progress-bar-title',
+          text: 'Checking data ...'
+        });
+        
+        worker.postMessage({
+          action: 'run_data_check',
+          editAction: 'replace',
+          dataRows: dataRows,
+          tempHeaders: tempHeaders
+        });
+      }
+      else {
+        setInputFieldsDisplayed(true);
+        showTemplateError(true);
+
+        worker.postMessage({
+          action: 'change_element_text',
+          element: '#progress-bar-title',
+          text: 'Progress'
+        });
       }
     }
 
     file = undefined;
   };
 
-  function runReadExcelData(dataRows) {
-    previewContactDataContainer.rows().remove().draw();
-    showUploadProblemsReport(false, 0, 0);
-    updateProgressBar(0);
-
-    setTimeout(() => {
-      worker.postMessage({
-        action: 'run_read_excel_data',
-        dataRows: dataRows
-      });
-    }, 1000);
-  };
-
-  async function readExcelData(dataRows) {
-    var tempHeaders = [];
-    var isTemplateOk = true;
-    var tempRowData = [];
-    var tempUniques = [];
-    var newTempContacts = [];
-
-    var tempPreviewTableContacts = [];
-    tempNewValidContacts = [];
-    tempNewInvalidContacts = [];
-
-    selectedHeaders.map((val, key) => {
-      tempHeaders.push({
-        name: val.header_name.toLowerCase().replaceAll(replacePattern, ''),
-        type: val.column_type,
-        is_mandatory: val.is_mandatory,
-        is_unique: val.is_unique
-      });
-    });
-    // console.log(tempHeaders);
-
-    // --- template checking
-    if (dataRows[0].length == tempHeaders.length) {
-      dataRows[0].map((val, key) => {
-        var tempName = val.toLowerCase();
-
-        if (tempName.indexOf('(') > -1) {
-          tempName = val.substr(0, val.indexOf('(')).toLowerCase();
-        }
-        tempName = tempName.replaceAll(replacePattern, '');
-        // console.log(tempName);
-        
-        if (tempName !== tempHeaders[key].name) {
-          isTemplateOk = false;
-        }
-
-        tempName = null;
-      });
-    }
-    else {
-      isTemplateOk = false;
-    }
-
-    if (isTemplateOk) {
-      var tempDataRows = [];
-      dataRows.map((v, k) => {
-        tempDataRows.push(v);
-      });
-      tempDataRows.shift();
-
-      if (editAction === 'merge') {
-        var tempPreviousContacs = [];
-        // console.log(previousContacts);
-
-        previousContacts.map((valPrevContact, keyPrevContact) => {
-          var tempContact = [];
-          tempHeaders.map((valHeader, keyHeader) => {
-            tempContact.push(valPrevContact[valHeader.name]);
-          });
-          tempContact['cont_created_at'] = valPrevContact.cont_created_at;
-          tempPreviousContacs.push(tempContact);
-          tempContact = undefined;
-        });
-        // console.log(tempPreviousContacs);
-        newTempContacts = $.merge( $.merge( [], tempPreviousContacs ), tempDataRows );
-      }
-      else {
-        newTempContacts = tempDataRows;
-      }
-      // console.log(newTempContacts);
-
-      var percentage = 0;
-      var dataCount = newTempContacts.length;
-      var dataErrorsCount = 0;
-
-      newTempContacts.map((valDataRow, keyDataRow) => {
-        var tempNewRow = {};
-        var tempHeaderName = '';
-        var tempErrors = [];
-        var isContentOk = true;
-
-        tempHeaders.map((valHeader, keyHeader) => {
-          tempHeaderName = valHeader.name;
-          tempNewRow[tempHeaderName] = valDataRow[keyHeader];
-          // console.log('tempHeaderName: ' + tempHeaderName + ', type: ' + valHeader.type + ', tempNewRow[tempHeaderName]: ' + tempNewRow[tempHeaderName]);
-
-          if (tempNewRow[tempHeaderName] === undefined) {
-            tempNewRow[tempHeaderName] = '';
-          }
-
-          switch (valHeader.type) {
-            case 'numeric':
-              if ((tempNewRow[tempHeaderName].length > 0) && isNaN(tempNewRow[tempHeaderName])) {
-                tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
-                isContentOk = false;
-                dataErrorsCount++;
-              }
-              break;
-            case 'datetime':
-              if (tempNewRow[tempHeaderName].length > 0) {
-                var dateTime = luxon.DateTime.fromFormat(tempNewRow[tempHeaderName], 'yyyy-MM-dd HH:mm:ss');
-                if (!dateTime.isValid) {
-                  tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
-                  isContentOk = false;
-                  dataErrorsCount++;
-                }
-                // console.log(tempHeaderName + ' ' + valHeader.type + ' ' + tempNewRow[tempHeaderName] + ' isValid: ' + dateTime.isValid);
-                dateTime = undefined;
-              }
-              break;
-            case 'date':
-              if (tempNewRow[tempHeaderName].length > 0) {
-                var dateTime = luxon.DateTime.fromFormat(tempNewRow[tempHeaderName], 'yyyy-MM-dd');
-                if (!dateTime.isValid) {
-                  tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
-                  isContentOk = false;
-                  dataErrorsCount++;
-                }
-                // console.log(tempHeaderName + ' ' + valHeader.type + ' ' + tempNewRow[tempHeaderName] + ' isValid: ' + dateTime.isValid);
-                dateTime = undefined;
-              }
-              break;
-            case 'time':
-              if (tempNewRow[tempHeaderName].length > 0) {
-                var dateTime = luxon.DateTime.fromFormat(tempNewRow[tempHeaderName], 'HH:mm:ss');
-                if (!dateTime.isValid) {
-                  tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
-                  isContentOk = false;
-                  dataErrorsCount++;
-                }
-                // console.log(tempHeaderName + ' ' + valHeader.type + ' ' + tempNewRow[tempHeaderName] + ' isValid: ' + dateTime.isValid);
-                dateTime = undefined;
-              }
-              break;
-            case 'handphone':
-              // console.log(tempHeaderName + ' ' + valHeader.type + ' ' + tempNewRow[tempHeaderName]);
-              if (tempNewRow[tempHeaderName].length > 0) {
-                if (isNaN(tempNewRow[tempHeaderName])) {
-                  tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
-                  isContentOk = false;
-                  dataErrorsCount++;
-                }
-                else {
-                  var phone = libphonenumber.parsePhoneNumber(tempNewRow[tempHeaderName], 'ID');
-                  if (!phone.isValid()) {
-                    tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
-                    isContentOk = false;
-                    dataErrorsCount++;
-                  }
-                  phone = undefined;
-                }
-              }
-              break;
-            default: break;
-          }
-          
-          if (valHeader.is_mandatory) {
-            if (tempNewRow[tempHeaderName].length == 0) {
-              tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data invalid</small>');
-              isContentOk = false;
-              dataErrorsCount++;
-            }
-          }
-          
-          if (valHeader.is_unique) {
-            if ((tempNewRow[tempHeaderName].length > 0) && tempUniques.includes(tempNewRow[tempHeaderName])) {
-              tempErrors.push('<small class="text-danger"><span class="fw-bold">' + tempHeaderName.toUpperCase() + '</span> data duplicate</small>');
-              isContentOk = false;
-              dataErrorsCount++;
-            }
-            else {
-              tempUniques.push(tempNewRow[tempHeaderName]);
-            }
-          }
-        });
-
-        if (isContentOk) {
-          tempNewRow['errors'] = null;
-          if (valDataRow.cont_created_at === undefined) {
-            tempNewValidContacts.push(tempNewRow);
-          }
-        }
-        else {
-          tempNewRow['errors'] = tempErrors.join('<br>');
-          // newTempContacts[keyContact] = tempNewRow;
-          tempNewInvalidContacts.push(tempNewRow);
-        }
-        
-        tempPreviewTableContacts.push(tempNewRow);
-        percentage = ((tempPreviewTableContacts.length / dataCount) * 100).toFixed(2);
-
-        setTimeout((percentage) => {
-          updateProgressBar(percentage);
-        }, 800, percentage);
-
-        tempNewRow = undefined;
-        // console.log('readExcelData: ' + (k + 1));
-      });
-
-      percentage = undefined;
-
-      setTimeout((previewContactDataContainer, tempPreviewTableContacts, tempNewValidContacts) => {
-        if (tempNewInvalidContacts.length > 0) {
-          showUploadProblemsReport(true, tempNewInvalidContacts.length, dataErrorsCount);
-        }
-
-        $('#input-campaign-rows').val(JSON.stringify(tempNewValidContacts));
-        previewContactDataContainer.rows.add(tempPreviewTableContacts).draw();
-        
-      }, 1500, previewContactDataContainer, tempPreviewTableContacts, tempNewValidContacts);
-    }
-    else {
-      $('#alert-different-templates-container').show();
-      $('#input-campaign-excel-file').addClass('is-invalid');
-      $('#different-templates-message').show();
-    }
-
-    tempRowData = undefined;
-    isTemplateOk = undefined;
-    tempHeaders = undefined;
-  };
-
-  function isInputFieldsDisplayed(isDisplayed) {
+  function setInputFieldsDisplayed(isDisplayed) {
     if (isDisplayed) {
       $('#input-campaign-name').removeAttr('disabled');
       $('#input-campaign-excel-file').removeAttr('disabled');
       $('#btn-submit-create-campaign').removeClass('disabled');
+      $('#btn-download-campaign-template').removeClass('disabled');
       $('#submit-spinner-save-contacts').hide();
       $('#submit-spinner-save-contacts-text').hide();
+      $('#option-campaign-templates').removeAttr('disabled');
       $('.btn-back').removeClass('disabled');
+      $('.spinner-border').hide();
+      
     }
     else {
       $('#input-campaign-name').attr('disabled', 'disabled');
       $('#input-campaign-excel-file').attr('disabled', 'disabled');
       $('#btn-submit-create-campaign').addClass('disabled');
+      $('#btn-download-campaign-template').addClass('disabled');
       $('#submit-spinner-save-contacts').show();
       $('#submit-spinner-save-contacts-text').show();
+      $('#option-campaign-templates').attr('disabled', 'disabled');
       $('.btn-back').addClass('disabled');
+      $('.spinner-border').show();
+    }
+  };
+
+  function showUploadProblemsReport(isDisplayed, rowsCount, dataCount) {
+    $('#upload-problems-rows-count').text(rowsCount);
+    $('#upload-problems-data-count').text(dataCount);
+    isDisplayed ? $('#alert-upload-problems').show() : $('#alert-upload-problems').hide();
+  };
+
+  function showTemplateError(isDisplayed) {
+    if (isDisplayed) {
+      // $('#alert-different-templates-container').show();
+      $('#input-campaign-excel-file').addClass('is-invalid');
+      $('#different-templates-message').show();
+    }
+    else {
+      // $('#alert-different-templates-container').hide();
+      $('#input-campaign-excel-file').removeClass('is-invalid');
+      $('#different-templates-message').hide();
     }
   };
 
@@ -804,144 +663,76 @@ var worker = '';
     }
   };
 
-  function updateProgressBar(percentage) {
-    // console.log('percentage: ' + percentage);
-    $('#upload-progress').val(percentage + '%');
-    $('#progress-bar-value').text(percentage + '%');
-    $('#progress-bar-value').css({ 'width': percentage + '%' });
-  };
-
   function initWorker() {
     worker = new Worker('{{ url('js/demo_worker.js') }}');
     worker.onmessage = function(e) {
       // console.log(e.data);
-      if (e.data.action === 'from_worker_run_read_excel_data') {
-        readExcelData(e.data.dataRows);
-      }
-      else if (e.data.action === 'from_worker_run_data_check') {
-        readExcelData(e.data.dataRows);
-      }
-      else if (e.data.action === 'from_worker_hide_interactive_elements') {
-        isInputFieldsDisplayed(false);
+      if (e.data.action === 'from_worker_hide_interactive_elements') {
+        setInputFieldsDisplayed(false);
       }
       else if (e.data.action === 'from_worker_show_interactive_elements') {
-        isInputFieldsDisplayed(true);
+        setInputFieldsDisplayed(true);
       }
       else if (e.data.action === 'from_worker_update_progress_count') {
-        // isInputFieldsDisplayed(true);
+        // setInputFieldsDisplayed(true);
         // updateProgressCount(e.data.campaignRows, e.data.dataRowsCount);
 
         var percentage = ((e.data.campaignRows.length / e.data.dataRowsCount) * 100).toFixed(2);
         $('#progress-bar-value').text(percentage + '%');
         $('#progress-bar-value').css('width', percentage + '%');
       }
+      else if (e.data.action === 'from_worker_run_data_check') {
+        tempAllContacts.push(e.data.row);
+
+        if (e.data.row.errors !== null) {
+          invalidRowsCount++;
+          invalidDataCount += e.data.dataErrorsCount;
+        }
+        else {
+          tempValidContacts.push(e.data.row);
+        }
+        
+        var percentage = ((tempAllContacts.length / e.data.total_count) * 100).toFixed(2);
+        updateProgressBar(percentage);
+        
+        if (tempAllContacts.length === e.data.total_count) {
+          setTimeout((tempValidContacts) => {
+            $('#input-campaign-rows').val(JSON.stringify(tempValidContacts));
+
+            if (invalidRowsCount > 0) {
+              showUploadProblemsReport(true, invalidRowsCount, invalidDataCount);
+            }
+
+            updateTableContents(JSON.parse(JSON.stringify(tempAllContacts)));
+            setInputFieldsDisplayed(true);
+
+            worker.postMessage({
+              action: 'change_element_text',
+              element: '#progress-bar-title',
+              text: 'Progress'
+            });
+
+            tempValidContacts = undefined;
+          }, 500, tempValidContacts);
+        }
+      }
+      else if (e.data.action === 'from_worker_change_element_text') {
+        $(e.data.element).text(e.data.text);
+      }
     }
   };
 
-  function showUploadProblemsReport(isDisplayed, rowsCount, dataCount) {
-    $('#upload-problems-rows-count').text(rowsCount);
-    $('#upload-problems-data-count').text(dataCount);
-    isDisplayed ? $('#alert-upload-problems').show() : $('#alert-upload-problems').hide();
-  }
-
-  @if (isset($failed_contacts))
-  function populateFailedContacts() {
-    var failedContactsText = '@php echo($failed_contacts); @endphp';
-    var failedContactsObjects = JSON.parse(failedContactsText);
-
-    $('#input-failed-contacts').val(failedContactsText);
-
-    failedContactDataContainer.clear();
-    failedContactDataContainer.rows.add(failedContactsObjects);
-    failedContactDataContainer.draw();
-  }
-  @endif
-
-  /*
-  async function handleFileAsync(e) {
-    worker.postMessage({
-      action: 'hide_interactive_elements'
-    });
-    
-    const file = e.target.files[0];
-    const data = await file.arrayBuffer();
-    const workbook = XLSX.read(data, { dense:true });
-    const tempNewPhoneRows = [];
-    const campaignRows = [];
-
-    const dataRows = XLSX.utils.sheet_to_json(
-      workbook.Sheets[workbook.SheetNames[0]],
-      { header:1 }
-    );
-    dataRows.shift();
-
-    $.each(dataRows, function(k, v) {
-      var tempNewRow = {
-        'account_id': v[0],
-        'name': v[1],
-        'phone': v[2],
-        'bill_date': v[3],
-        'due_date': v[4],
-        'nominal': v[5]
-      };
-
-      customHeaders.map((val, key) => {
-        tempNewRow[val.name.toLowerCase()] = v[5 + (key + 1)];
-      });
-
-      tempNewPhoneRows.push(tempNewRow);
-      campaignRows.push(tempNewRow);
-    });
-
-    previewContactDataContainer.clear();
-    previewContactDataContainer.rows.add(tempNewPhoneRows);
-    previewContactDataContainer.draw();
-
-    $('#input-campaign-rows').val(JSON.stringify(tempNewPhoneRows));
-    
-    worker.postMessage({
-      action: 'show_interactive_elements'
-    });
+  function updateTableContents(newData) {
+    // console.log(newData.length);
+    previewContactDataContainer.rows.add(newData).draw();
   };
-  
-  function preparePreviewContactTable() {
-    var columns = [
-      { data: 'account_id' },
-      { data: 'name' },
-      { data: 'phone' },
-      { data: 'bill_date' },
-      { data: 'due_date' },
-      { data: 'nominal' }
-    ];
-    var columnDefs = [
-      {
-        targets: 5,
-        className: 'dt-body-right'
-      }
-    ];
 
-    customHeaders.map((v, k) => {
-      columns.push({
-        data: v.name.toLowerCase()
-      });
-
-      if (v.column_type === 'numeric') {
-        columnDefs.push({
-          targets: 5 + (k + 1),
-          className: 'dt-body-right'
-        });
-      }
-    });
-
-    previewContactDataContainer = $('#table-preview-contact-data-container').DataTable({
-      processing: true,
-      lengthMenu: [5, 10, 15, 20, 50, 100],
-      pageLength: 15,
-      columns: columns,
-      columnDefs: columnDefs
-    });
+  function updateProgressBar(percentage) {
+    // console.log('percentage: ' + percentage);
+    $('#upload-progress').val(percentage + '%');
+    $('#progress-bar-value').text(percentage + '%');
+    $('#progress-bar-value').css({ 'width': percentage + '%' });
   };
-  */
 </script>
 @endpush
 
