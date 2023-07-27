@@ -14,7 +14,7 @@ class DashboardController extends Controller
 {
 
     public function __construct() {
-        $this->middleware('auth');
+        // $this->middleware('auth');
     }
 
     public function index()
@@ -27,6 +27,8 @@ class DashboardController extends Controller
         header('Content-Type: text/event-stream');
         header('Cache-Control: no-cache');
 
+        $MAX_DIAL_TRIES = 3;
+
         $now = date('Y-m-d');
         $data = array(
             'status' => false,
@@ -35,7 +37,7 @@ class DashboardController extends Controller
         );
 
         $campaigns = Campaign::selectRaw('
-                campaigns.id, campaigns.name, campaigns.total_data
+                campaigns.id, campaigns.name, campaigns.total_data, campaigns.reference_table
             ')
             ->where('campaigns.status', 1)
             ->whereNull('campaigns.deleted_at')
@@ -53,28 +55,30 @@ class DashboardController extends Controller
                 'data_remaining' => 0,
             );
 
-            foreach($campaigns AS $keyCampaign => $valCampaign) {
-                $calls = CallLog::selectRaw('
-                        CAST(IFNULL(SUM(IF(call_response="answered", 1, 0)), 0) AS INT) AS call_answered,
-                        CAST(IFNULL(SUM(IF(call_response="no_answer", 1, 0)), 0) AS INT) AS call_noanswer,
-                        CAST(IFNULL(SUM(IF(call_response="busy", 1, 0)), 0) AS INT) AS call_busy,
-                        CAST(IFNULL(SUM(IF(call_response="failed", 1, 0)), 0) AS INT) AS call_failed,
-                        CAST(SUM(IF(call_response IS NULL, 1, 0)) AS INT) AS data_remaining
-                    ')
-                    // ->whereRaw("DATE(call_dial) = ?", [$now])
-                    ->where('campaign_id', $valCampaign->id)
-                    ->whereRaw("DATE(call_dial) = '2023-06-25'")
+            foreach($data['campaigns'] AS $keyCampaign => $valCampaign) {
+                $calls = DB::table($valCampaign->reference_table)
+                    ->selectRaw("
+                        contacts.id AS cont_id, contacts.call_dial AS cont_call_dial, contacts.call_response AS cont_call_response,
+                        contacts.total_calls AS cont_total_calls,
+                        (SELECT COUNT(contacts.id) FROM contacts WHERE contacts.campaign_id=" . $valCampaign->id . " AND (contacts.total_calls=" . $MAX_DIAL_TRIES . " OR contacts.call_response='answered')) AS completed_dials,
+                        (SELECT COUNT(call_logs.call_response) FROM call_logs WHERE call_logs.call_response='answered' AND call_logs.campaign_id=" . $valCampaign->id . ") AS call_answered,
+                        (SELECT COUNT(call_logs.call_response) FROM call_logs WHERE call_logs.call_response='busy' AND call_logs.campaign_id=" . $valCampaign->id . ") AS call_busy,
+                        (SELECT COUNT(call_logs.call_response) FROM call_logs WHERE call_logs.call_response='no_answer' AND call_logs.campaign_id=" . $valCampaign->id . ") AS call_noanswer,
+                        (SELECT COUNT(call_logs.call_response) FROM call_logs WHERE call_logs.call_response='failed' AND call_logs.campaign_id=" . $valCampaign->id . ") AS call_failed,
+                        (SELECT COUNT(call_logs.id) FROM call_logs WHERE call_logs.campaign_id=" . $valCampaign->id . " AND call_logs.call_dial IS NOT NULL) AS dialed_contacts
+                    ")
+                    ->leftJoin('contacts', $valCampaign->reference_table . '.contact_id', '=', 'contacts.id')
+                    ->where($valCampaign->reference_table . '.campaign_id', $valCampaign->id)
                     ->first();
-                $data['status'] = $calls;
 
-                $campaigns[$keyCampaign]['data_called'] = $calls->call_answered + $calls->call_noanswer + $calls->call_busy + $calls->call_failed;
-                $campaigns[$keyCampaign]['data_remaining'] = $valCampaign->total_data - $campaigns[$keyCampaign]['data_called'];
+                $data['campaigns'][$keyCampaign]['data_called'] = $calls->completed_dials;
+                $data['campaigns'][$keyCampaign]['data_remaining'] = $valCampaign->total_data - $calls->completed_dials;
 
                 $data['calls']['call_answered'] += $calls->call_answered;
                 $data['calls']['call_noanswer'] += $calls->call_noanswer;
                 $data['calls']['call_busy'] += $calls->call_busy;
                 $data['calls']['call_failed'] += $calls->call_failed;
-                $data['calls']['data_remaining'] += $calls->data_remaining;
+                $data['calls']['data_remaining'] += $valCampaign->total_data - $calls->completed_dials;
             }
         }
 

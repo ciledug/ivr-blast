@@ -34,7 +34,7 @@ class CallLogSeeder extends Seeder
         $callResponse = null;
 
         // ---
-        // --- insert dummy for campaign-id 2, running campaign
+        // --- insert dummy for campaign id #2, running-campaign
         // ---
         $campaign = Campaign::select('id', 'reference_table')->where('id', 2)->first();
         $referenceTable = strtolower($campaign->reference_table);
@@ -63,7 +63,7 @@ class CallLogSeeder extends Seeder
             // dd($contact);
             $tempContactCount = $contact->count();
 
-            if (($tempContactCount < 3) && ($contact[$tempContactCount - 1]->con_call_response !== 'answered')) {
+            if (($tempContactCount <= 3) && ($contact[$tempContactCount - 1]->con_call_response !== 'answered')) {
                 $contact = $contact[$tempContactCount - 1];
 
                 $tempDialDate = $contact->con_due_date . ' ' . date('H:i:s');
@@ -116,7 +116,7 @@ class CallLogSeeder extends Seeder
         
         
         // ---
-        // --- insert dummy for campaign-id 3, finished campaign
+        // --- insert dummy for campaign id #3, finished-campaign
         // ---
         $campaign = Campaign::select('id', 'reference_table')->where('id', 3)->first();
         $referenceTable = strtolower($campaign->reference_table);

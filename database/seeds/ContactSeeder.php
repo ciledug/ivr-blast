@@ -143,7 +143,7 @@ class ContactSeeder extends Seeder
                 ]);
 
                 // ---
-                // --- dummy data for campaign id #1
+                // --- dummy data for campaign id #1, ready-campaign
                 // ---
                 if ($valCampaign['campaign_id'] == 1) {
                     DB::table($valCampaign['reference_table'])->insert([
@@ -161,7 +161,7 @@ class ContactSeeder extends Seeder
                 }
 
                 // ---
-                // --- dummy data for campaign id #2
+                // --- dummy data for campaign id #2, running-campaign
                 // ---
                 if ($valCampaign['campaign_id'] == 2) {
                     DB::table($valCampaign['reference_table'])->insert([
@@ -169,7 +169,7 @@ class ContactSeeder extends Seeder
                         'contact_id' => $contact->id,
                         'product_name' => $faker->creditCardType(),
                         'phone' => $tempPhone,
-                        'due_date' => $lastWeek->format('Y-m-d'),
+                        'due_date' => Carbon::now('Asia/Jakarta')->format('Y-m-d'),
                         'nominal' => $tempNominal,
                         'created_at' => Carbon::now('Asia/Jakarta')->format('Y-m-d H:i:s'),
                         'updated_at' => Carbon::now('Asia/Jakarta')->format('Y-m-d H:i:s'),
@@ -177,7 +177,7 @@ class ContactSeeder extends Seeder
                 }
 
                 // ---
-                // --- dummy data for campaign id #5
+                // --- dummy data for campaign id #3, finished-campaign
                 // ---
                 if ($valCampaign['campaign_id'] == 3) {
                     DB::table($valCampaign['reference_table'])->insert([
